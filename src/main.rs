@@ -7,10 +7,10 @@ use quicksilver::{
 };
 
 use std::collections::HashMap;
+use multiarray::*;
 
 #[derive(Clone, Debug, PartialEq)]
 struct Tile {
-    pos: Vector,
     glyph: char,
     color: Color,
 }
@@ -18,26 +18,24 @@ struct Tile {
 #[derive(Clone, Debug, PartialEq)]
 struct Entity {
     pos: Vector,
-    glyph: char,
-    color: Color,
+    tile: Tile,
     hp: i32,
     max_hp: i32,
 }
 
 fn main() {
     let settings = Settings {
-        // scale: quicksilver::graphics::ImageScaleStrategy::Blur,
+        // scale: quicksilver::graphics::ImageScaleStrategy::Pixelate,
         ..Default::default()
     };
-    run::<Game>("Quicksilver Roguelike", Vector::new(800, 600), settings);
+    run::<Game>("ThiefRL 3", Vector::new(800, 600), settings);
 }
 
 struct Game {
     title: Asset<Image>,
     mononoki_font_info: Asset<Image>,
     square_font_info: Asset<Image>,
-    map_size: Vector,
-    map: Vec<Tile>,
+    map: Array2D<Tile>,
     entities: Vec<Entity>,
     player_id: usize,
     tileset: Asset<HashMap<char, Image>>,
@@ -51,7 +49,7 @@ impl State for Game {
         let font_square = "square.ttf";
 
         let title = Asset::new(Font::load(font_mononoki).and_then(|font| {
-            font.render("Quicksilver Roguelike", &FontStyle::new(72.0, Color::BLACK))
+            font.render("ThiefRL 3", &FontStyle::new(72.0, Color::BLACK))
         }));
 
         let mononoki_font_info = Asset::new(Font::load(font_mononoki).and_then(|font| {
@@ -68,15 +66,16 @@ impl State for Game {
             )
         }));
 
-        let map_size = Vector::new(20, 15);
-        let map = generate_map(map_size);
+        let map = generate_map(20, 15);
         let mut entities = generate_entities();
 
         let player_id = entities.len();
         entities.push(Entity {
             pos: Vector::new(5, 3),
-            glyph: '@',
-            color: Color::BLUE,
+            tile: Tile{
+                glyph: '@',
+                color: Color::BLUE,
+            },
             hp: 3,
             max_hp: 5,
         });
@@ -101,7 +100,6 @@ impl State for Game {
             title,
             mononoki_font_info,
             square_font_info,
-            map_size,
             map,
             entities,
             player_id,
@@ -137,11 +135,14 @@ impl State for Game {
     fn draw(&mut self, window: &mut Window) -> Result<()> {
         window.clear(Color::WHITE)?;
 
+        let window_size_x = window.screen_size().x as i32;
+        let window_size_y = window.screen_size().y as i32;
+
         self.title.execute(|image| {
             window.draw(
                 &image
                     .area()
-                    .with_center((window.screen_size().x as i32 / 2, 40)),
+                    .with_center((window_size_x / 2, 40)),
                 Img(&image),
             );
             Ok(())
@@ -151,7 +152,7 @@ impl State for Game {
             window.draw(
                 &image
                     .area()
-                    .translate((2, window.screen_size().y as i32 - 60)),
+                    .translate((2, window_size_y - 60)),
                 Img(&image),
             );
             Ok(())
@@ -161,7 +162,7 @@ impl State for Game {
             window.draw(
                 &image
                     .area()
-                    .translate((2, window.screen_size().y as i32 - 30)),
+                    .translate((2, window_size_y - 30)),
                 Img(&image),
             );
             Ok(())
@@ -170,28 +171,31 @@ impl State for Game {
         let tile_size_px = self.tile_size_px;
         let offset_px = Vector::new(50, 120);
 
-        let (tileset, map) = (&mut self.tileset, &self.map);
+        let (map_size_x, map_size_y) = (self.map.extents()[0], self.map.extents()[1]);
+
+        let tileset = &mut self.tileset;
+        let map = &self.map;
+        let entities = &self.entities;
         tileset.execute(|tileset| {
-            for tile in map.iter() {
-                if let Some(image) = tileset.get(&tile.glyph) {
-                    let pos_px = tile.pos.times(tile_size_px);
-                    window.draw(
-                        &Rectangle::new(offset_px + pos_px, image.area().size()),
-                        Blended(&image, tile.color),
-                    );
+            for x in 0..map_size_x {
+                for y in 0..map_size_y {
+                    let pos = Vector::new(x as f32, y as f32);
+                    let tile = &map[[x, y]];
+                    if let Some(image) = tileset.get(&tile.glyph) {
+                        let pos_px = offset_px + tile_size_px.times(pos);
+                        window.draw(
+                            &Rectangle::new(pos_px, image.area().size()),
+                            Blended(&image, tile.color),
+                        )
+                    }
                 }
             }
-            Ok(())
-        })?;
-
-        let (tileset, entities) = (&mut self.tileset, &self.entities);
-        tileset.execute(|tileset| {
             for entity in entities.iter() {
-                if let Some(image) = tileset.get(&entity.glyph) {
+                if let Some(image) = tileset.get(&entity.tile.glyph) {
                     let pos_px = offset_px + entity.pos.times(tile_size_px);
                     window.draw(
                         &Rectangle::new(pos_px, image.area().size()),
-                        Blended(&image, entity.color),
+                        Blended(&image, entity.tile.color),
                     );
                 }
             }
@@ -203,7 +207,7 @@ impl State for Game {
         let current_health_width_px =
             (player.hp as f32 / player.max_hp as f32) * full_health_width_px;
 
-        let map_size_px = self.map_size.times(tile_size_px);
+        let map_size_px = tile_size_px.times(Vector::new(map_size_x as f32, map_size_y as f32));
         let health_bar_pos_px = offset_px + Vector::new(map_size_px.x, 0.0);
 
         // Full health
@@ -222,22 +226,23 @@ impl State for Game {
     }
 }
 
-fn generate_map(size: Vector) -> Vec<Tile> {
-    let width = size.x as usize;
-    let height = size.y as usize;
-    let mut map = Vec::with_capacity(width * height);
+fn generate_map(width: usize, height: usize) -> Array2D<Tile> {
+    let default_tile = Tile {
+        glyph: '.', color:
+        Color::BLACK,
+    };
+    let mut map = Array2D::new([width, height], default_tile);
     for x in 0..width {
         for y in 0..height {
             let mut tile = Tile {
-                pos: Vector::new(x as f32, y as f32),
                 glyph: '.',
                 color: Color::BLACK,
             };
 
             if x == 0 || x == width - 1 || y == 0 || y == height - 1 {
                 tile.glyph = '#';
-            };
-            map.push(tile);
+            }
+            map[[x, y]] = tile;
         }
     }
     map
@@ -245,33 +250,27 @@ fn generate_map(size: Vector) -> Vec<Tile> {
 
 fn generate_entities() -> Vec<Entity> {
     vec![
-        Entity {
-            pos: Vector::new(9, 6),
-            glyph: 'g',
-            color: Color::RED,
-            hp: 1,
-            max_hp: 1,
-        },
-        Entity {
-            pos: Vector::new(2, 4),
-            glyph: 'g',
-            color: Color::RED,
-            hp: 1,
-            max_hp: 1,
-        },
-        Entity {
-            pos: Vector::new(7, 5),
-            glyph: '%',
-            color: Color::PURPLE,
-            hp: 0,
-            max_hp: 0,
-        },
-        Entity {
-            pos: Vector::new(4, 8),
-            glyph: '%',
-            color: Color::PURPLE,
-            hp: 0,
-            max_hp: 0,
-        },
+        goblin(9, 6),
+        goblin(2, 4),
+        food(7, 5),
+        food(4, 8),
     ]
+}
+
+fn goblin(x: i32, y: i32) -> Entity {
+    Entity {
+        pos: Vector::new(x, y),
+        tile: Tile { glyph: 'g', color: Color::RED },
+        hp: 1,
+        max_hp: 1,
+    }
+}
+
+fn food(x: i32, y: i32) -> Entity {
+    Entity {
+        pos: Vector::new(x, y),
+        tile: Tile { glyph: '%', color: Color::PURPLE },
+        hp: 0,
+        max_hp: 0,
+    }
 }
