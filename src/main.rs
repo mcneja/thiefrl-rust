@@ -7,26 +7,28 @@ use quicksilver::{
 };
 
 use multiarray::*;
+use vector2d::Vector2D;
 
+#[allow(dead_code)]
 mod color_preset {
     use quicksilver::graphics::Color;
 
     pub const BLACK: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 };
-//    pub const DARK_BLUE: Color = Color { r: 0.0, g: 0.0, b: 0.6588, a: 1.0 };
-//    pub const DARK_GREEN: Color = Color { r: 0.0, g: 0.6588, b: 0.0, a: 1.0 };
-//    pub const DARK_CYAN: Color = Color { r: 0.0, g: 0.6588, b: 0.6588, a: 1.0 };
-//    pub const DARK_RED: Color = Color { r: 0.6588, g: 0.0, b: 0.0, a: 1.0 };
-//    pub const DARK_MAGENTA: Color = Color { r: 0.6588, g: 0.0, b: 0.6588, a: 1.0 };
-//    pub const DARK_BROWN: Color = Color { r: 0.6588, g: 0.3294, b: 0.0, a: 1.0 };
+    pub const DARK_BLUE: Color = Color { r: 0.0, g: 0.0, b: 0.6588, a: 1.0 };
+    pub const DARK_GREEN: Color = Color { r: 0.0, g: 0.6588, b: 0.0, a: 1.0 };
+    pub const DARK_CYAN: Color = Color { r: 0.0, g: 0.6588, b: 0.6588, a: 1.0 };
+    pub const DARK_RED: Color = Color { r: 0.6588, g: 0.0, b: 0.0, a: 1.0 };
+    pub const DARK_MAGENTA: Color = Color { r: 0.6588, g: 0.0, b: 0.6588, a: 1.0 };
+    pub const DARK_BROWN: Color = Color { r: 0.6588, g: 0.3294, b: 0.0, a: 1.0 };
     pub const LIGHT_GRAY: Color = Color { r: 0.6588, g: 0.6588, b: 0.6588, a: 1.0 };
-//    pub const DARK_GRAY: Color = Color { r: 0.3294, g: 0.3294, b: 0.3294, a: 1.0 };
-//    pub const LIGHT_BLUE: Color = Color { r: 0.3294, g: 0.3294, b: 0.9961, a: 1.0 };
-//    pub const LIGHT_GREEN: Color = Color { r: 0.3294, g: 0.9961, b: 0.3294, a: 1.0 };
+    pub const DARK_GRAY: Color = Color { r: 0.3294, g: 0.3294, b: 0.3294, a: 1.0 };
+    pub const LIGHT_BLUE: Color = Color { r: 0.3294, g: 0.3294, b: 0.9961, a: 1.0 };
+    pub const LIGHT_GREEN: Color = Color { r: 0.3294, g: 0.9961, b: 0.3294, a: 1.0 };
     pub const LIGHT_CYAN: Color = Color { r: 0.3294, g: 0.9961, b: 0.9961, a: 1.0 };
-//    pub const LIGHT_RED: Color = Color { r: 0.9961, g: 0.3294, b: 0.3294, a: 1.0 };
+    pub const LIGHT_RED: Color = Color { r: 0.9961, g: 0.3294, b: 0.3294, a: 1.0 };
     pub const LIGHT_MAGENTA: Color = Color { r: 0.9961, g: 0.3294, b: 0.9961, a: 1.0 };
     pub const LIGHT_YELLOW: Color = Color { r: 0.9961, g: 0.9961, b: 0.3264, a: 1.0 };
-//    pub const WHITE: Color = Color { r: 0.9961, g: 0.9961, b: 0.9961, a: 1.0 };
+    pub const WHITE: Color = Color { r: 0.9961, g: 0.9961, b: 0.9961, a: 1.0 };
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -37,10 +39,8 @@ struct Tile {
 
 #[derive(Clone, Debug, PartialEq)]
 struct Entity {
-    pos: Vector,
+    pos: Vector2D<i32>,
     tile: Tile,
-    hp: i32,
-    max_hp: i32,
 }
 
 struct Game {
@@ -53,7 +53,7 @@ struct Game {
 
 fn main() {
     let settings = Settings {
-        // scale: quicksilver::graphics::ImageScaleStrategy::Pixelate,
+        scale: quicksilver::graphics::ImageScaleStrategy::Pixelate,
         ..Default::default()
     };
     run::<Game>("ThiefRL 3", Vector::new(880, 760), settings);
@@ -69,13 +69,8 @@ impl State for Game {
 
         let player_id = entities.len();
         entities.push(Entity {
-            pos: Vector::new(5, 3),
-            tile: Tile{
-                glyph: 32,
-                color: color_preset::LIGHT_CYAN,
-            },
-            hp: 3,
-            max_hp: 5,
+            pos: Vector2D::new(5, 3),
+            tile: Tile{ glyph: 32, color: color_preset::LIGHT_CYAN },
         });
 
         let tile_size_px = Vector::new(16, 16);
@@ -109,16 +104,16 @@ impl State for Game {
         let player = &mut self.entities[self.player_id];
         let keys = window.keyboard();
         if keys[Key::Left] == Pressed || keys[Key::Numpad4] == Pressed {
-            player.pos.x -= 1.0;
+            player.pos.x -= 1;
         }
         if keys[Key::Right] == Pressed || keys[Key::Numpad6] == Pressed {
-            player.pos.x += 1.0;
+            player.pos.x += 1;
         }
         if keys[Key::Up] == Pressed || keys[Key::Numpad8] == Pressed {
-            player.pos.y -= 1.0;
+            player.pos.y -= 1;
         }
         if keys[Key::Down] == Pressed || keys[Key::Numpad2] == Pressed {
-            player.pos.y += 1.0;
+            player.pos.y += 1;
         }
         if keys[Key::Escape] == Pressed {
             window.close();
@@ -150,7 +145,8 @@ impl State for Game {
             }
             for entity in entities.iter() {
                 let image = &tileset[entity.tile.glyph];
-                let pos_px = offset_px + entity.pos.times(tile_size_px);
+                let pos = Vector::new(entity.pos.x, entity.pos.y);
+                let pos_px = offset_px + pos.times(tile_size_px);
                 window.draw(
                     &Rectangle::new(pos_px, image.area().size()),
                     Blended(&image, entity.tile.color),
@@ -192,18 +188,14 @@ fn generate_entities() -> Vec<Entity> {
 
 fn guard(x: i32, y: i32) -> Entity {
     Entity {
-        pos: Vector::new(x, y),
+        pos: Vector2D::new(x, y),
         tile: Tile { glyph: 36, color: color_preset::LIGHT_MAGENTA },
-        hp: 1,
-        max_hp: 1,
     }
 }
 
 fn coin(x: i32, y: i32) -> Entity {
     Entity {
-        pos: Vector::new(x, y),
+        pos: Vector2D::new(x, y),
         tile: Tile { glyph: 110, color: color_preset::LIGHT_YELLOW },
-        hp: 0,
-        max_hp: 0,
     }
 }
