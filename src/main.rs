@@ -115,6 +115,22 @@ impl State for Game {
         if keys[Key::Down] == Pressed || keys[Key::Numpad2] == Pressed {
             player.pos.y += 1;
         }
+        if keys[Key::Numpad7] == Pressed {
+            player.pos.x -= 1;
+            player.pos.y -= 1;
+        }
+        if keys[Key::Numpad9] == Pressed {
+            player.pos.x += 1;
+            player.pos.y -= 1;
+        }
+        if keys[Key::Numpad1] == Pressed {
+            player.pos.x -= 1;
+            player.pos.y += 1;
+        }
+        if keys[Key::Numpad3] == Pressed {
+            player.pos.x += 1;
+            player.pos.y += 1;
+        }
         if keys[Key::Escape] == Pressed {
             window.close();
         }
