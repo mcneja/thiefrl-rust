@@ -2,7 +2,7 @@ use quicksilver::{
     geom::{Rectangle, Vector},
     graphics::{Background::{Blended}, Color, Image},
     input::Key,
-    lifecycle::{run, Asset, Settings, State, Window},
+    lifecycle::{run, Asset, Event, Settings, State, Window},
     Future, Result,
 };
 
@@ -32,6 +32,91 @@ mod color_preset {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+enum TileType {
+	GroundNormal,
+	GroundGravel,
+	GroundGrass,
+	GroundWater,
+	GroundMarble,
+	GroundWood,
+	GroundWoodCreaky,
+
+	//  NSEW
+	Wall0000,
+	Wall0001,
+	Wall0010,
+	Wall0011,
+	Wall0100,
+	Wall0101,
+	Wall0110,
+	Wall0111,
+	Wall1000,
+	Wall1001,
+	Wall1010,
+	Wall1011,
+	Wall1100,
+	Wall1101,
+	Wall1110,
+	Wall1111,
+
+	OneWayWindowE,
+	OneWayWindowW,
+	OneWayWindowN,
+	OneWayWindowS,
+	PortcullisNS,
+	PortcullisEW,
+	WindowNS,
+	WindowEW,
+	DoorNS,
+	DoorEW,
+	SecretDoorNS,
+	SecretDoorEW,
+}
+
+fn tile_def(tile_type: &TileType) -> Tile {
+    match tile_type {
+        TileType::GroundNormal     => Tile { glyph: 128, color: color_preset::LIGHT_GRAY },
+        TileType::GroundGravel     => Tile { glyph: 130, color: color_preset::LIGHT_GRAY },
+        TileType::GroundGrass      => Tile { glyph: 132, color: color_preset::DARK_GREEN },
+        TileType::GroundWater      => Tile { glyph: 134, color: color_preset::LIGHT_BLUE },
+        TileType::GroundMarble     => Tile { glyph: 136, color: color_preset::DARK_CYAN },
+        TileType::GroundWood       => Tile { glyph: 138, color: color_preset::DARK_BROWN },
+        TileType::GroundWoodCreaky => Tile { glyph: 138, color: color_preset::DARK_BROWN },
+
+        //  NSEW
+        TileType::Wall0000 => Tile { glyph: 176, color: color_preset::LIGHT_GRAY },
+        TileType::Wall0001 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY },
+        TileType::Wall0010 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY },
+        TileType::Wall0011 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY },
+        TileType::Wall0100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY },
+        TileType::Wall0101 => Tile { glyph: 179, color: color_preset::LIGHT_GRAY },
+        TileType::Wall0110 => Tile { glyph: 182, color: color_preset::LIGHT_GRAY },
+        TileType::Wall0111 => Tile { glyph: 185, color: color_preset::LIGHT_GRAY },
+        TileType::Wall1000 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY },
+        TileType::Wall1001 => Tile { glyph: 180, color: color_preset::LIGHT_GRAY },
+        TileType::Wall1010 => Tile { glyph: 181, color: color_preset::LIGHT_GRAY },
+        TileType::Wall1011 => Tile { glyph: 184, color: color_preset::LIGHT_GRAY },
+        TileType::Wall1100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY },
+        TileType::Wall1101 => Tile { glyph: 186, color: color_preset::LIGHT_GRAY },
+        TileType::Wall1110 => Tile { glyph: 183, color: color_preset::LIGHT_GRAY },
+        TileType::Wall1111 => Tile { glyph: 187, color: color_preset::LIGHT_GRAY },
+
+        TileType::OneWayWindowE => Tile { glyph: 196, color: color_preset::LIGHT_GRAY },
+        TileType::OneWayWindowW => Tile { glyph: 197, color: color_preset::LIGHT_GRAY },
+        TileType::OneWayWindowN => Tile { glyph: 198, color: color_preset::LIGHT_GRAY },
+        TileType::OneWayWindowS => Tile { glyph: 199, color: color_preset::LIGHT_GRAY },
+        TileType::PortcullisNS  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY },
+        TileType::PortcullisEW  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY },
+        TileType::WindowNS      => Tile { glyph: 189, color: color_preset::LIGHT_GRAY },
+        TileType::WindowEW      => Tile { glyph: 188, color: color_preset::LIGHT_GRAY },
+        TileType::DoorNS        => Tile { glyph: 189, color: color_preset::LIGHT_GRAY },
+        TileType::DoorEW        => Tile { glyph: 188, color: color_preset::LIGHT_GRAY },
+        TileType::SecretDoorNS  => Tile { glyph: 189, color: color_preset::LIGHT_GRAY },
+        TileType::SecretDoorEW  => Tile { glyph: 188, color: color_preset::LIGHT_GRAY },
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct Tile {
     glyph: usize,
     color: Color,
@@ -44,7 +129,7 @@ struct Entity {
 }
 
 struct Game {
-    map: Array2D<Tile>,
+    map: Array2D<TileType>,
     entities: Vec<Entity>,
     player_id: usize,
     tileset: Asset<Vec<Image>>,
@@ -54,9 +139,18 @@ struct Game {
 fn main() {
     let settings = Settings {
         scale: quicksilver::graphics::ImageScaleStrategy::Pixelate,
+        resize: quicksilver::graphics::ResizeStrategy::Maintain,
         ..Default::default()
     };
     run::<Game>("ThiefRL 3", Vector::new(880, 760), settings);
+}
+
+impl Game {
+    fn move_player(&mut self, dx: i32, dy: i32) {
+        let player = &mut self.entities[self.player_id];
+        player.pos.x += dx;
+        player.pos.y += dy;
+    }
 }
 
 impl State for Game {
@@ -64,13 +158,13 @@ impl State for Game {
     fn new() -> Result<Self> {
         let tiles_file = "tiles.png";
 
-        let map = generate_map(20, 15);
+        let map = generate_map(32, 32);
         let mut entities = generate_entities();
 
         let player_id = entities.len();
         entities.push(Entity {
             pos: Vector2D::new(5, 3),
-            tile: Tile{ glyph: 32, color: color_preset::LIGHT_CYAN },
+            tile: Tile{ glyph: 208, color: color_preset::LIGHT_CYAN },
         });
 
         let tile_size_px = Vector::new(16, 16);
@@ -79,7 +173,7 @@ impl State for Game {
             let mut tileset = Vec::new();
             for y in 0..16 {
                 for x in 0..16 {
-                    let pos_px = tile_size_px.times(Vector::new(x, y));
+                    let pos_px = tile_size_px.times(Vector::new(x, 15 - y));
                     let rect = Rectangle::new(pos_px, tile_size_px);
                     let tile = tiles.subimage(rect);
                     tileset.push(tile);
@@ -97,42 +191,22 @@ impl State for Game {
        })
     }
 
-    /// Process keyboard and mouse, update the game state
-    fn update(&mut self, window: &mut Window) -> Result<()> {
-        use quicksilver::input::ButtonState::*;
-
-        let player = &mut self.entities[self.player_id];
-        let keys = window.keyboard();
-        if keys[Key::Left] == Pressed || keys[Key::Numpad4] == Pressed {
-            player.pos.x -= 1;
-        }
-        if keys[Key::Right] == Pressed || keys[Key::Numpad6] == Pressed {
-            player.pos.x += 1;
-        }
-        if keys[Key::Up] == Pressed || keys[Key::Numpad8] == Pressed {
-            player.pos.y -= 1;
-        }
-        if keys[Key::Down] == Pressed || keys[Key::Numpad2] == Pressed {
-            player.pos.y += 1;
-        }
-        if keys[Key::Numpad7] == Pressed {
-            player.pos.x -= 1;
-            player.pos.y -= 1;
-        }
-        if keys[Key::Numpad9] == Pressed {
-            player.pos.x += 1;
-            player.pos.y -= 1;
-        }
-        if keys[Key::Numpad1] == Pressed {
-            player.pos.x -= 1;
-            player.pos.y += 1;
-        }
-        if keys[Key::Numpad3] == Pressed {
-            player.pos.x += 1;
-            player.pos.y += 1;
-        }
-        if keys[Key::Escape] == Pressed {
-            window.close();
+    fn event(&mut self, event: &Event, window: &mut Window) -> Result<()> {
+        match event {
+            Event::Key(key, quicksilver::input::ButtonState::Pressed) =>
+                match key {
+                    Key::Left | Key::Numpad4 => self.move_player(-1, 0),
+                    Key::Right | Key::Numpad6 => self.move_player(1, 0),
+                    Key::Up | Key::Numpad8 => self.move_player(0, -1),
+                    Key::Down | Key::Numpad2 => self.move_player(0, 1),
+                    Key::Numpad7 => self.move_player(-1, -1),
+                    Key::Numpad9 => self.move_player(1, -1),
+                    Key::Numpad1 => self.move_player(-1, 1),
+                    Key::Numpad3 => self.move_player(1, 1),
+                    Key::Escape => window.close(),
+                    _ => ()
+                }
+            _ => ()
         }
         Ok(())
     }
@@ -150,7 +224,8 @@ impl State for Game {
             for x in 0..map.extents()[0] {
                 for y in 0..map.extents()[1] {
                     let pos = Vector::new(x as f32, y as f32);
-                    let tile = &map[[x, y]];
+                    let tile_type = &map[[x, y]];
+                    let tile = &tile_def(tile_type);
                     let image = &tileset[tile.glyph];
                     let pos_px = offset_px + tile_size_px.times(pos);
                     window.draw(
@@ -175,21 +250,20 @@ impl State for Game {
     }
 }
 
-fn generate_map(width: usize, height: usize) -> Array2D<Tile> {
-    let default_tile = Tile {
-        glyph: 16,
-        color: color_preset::LIGHT_GRAY,
-    };
-    let mut map = Array2D::new([width, height], default_tile);
-    for x in 0..width {
-        for y in 0..height {
-            let mut glyph = 112;
-            if x == 0 || x == width - 1 || y == 0 || y == height - 1 {
-                glyph = 15;
-            }
-            map[[x, y]].glyph = glyph;
-        }
+fn generate_map(width: usize, height: usize) -> Array2D<TileType> {
+    let mut map = Array2D::new([width, height], TileType::GroundNormal);
+    for x in 1..width-1 {
+        map[[x, 0]] = TileType::Wall0011;
+        map[[x, height-1]] = TileType::Wall0011;
     }
+    for y in 1..height-1 {
+        map[[0, y]] = TileType::Wall1100;
+        map[[width-1, y]] = TileType::Wall1100;
+    }
+    map[[0, 0]] = TileType::Wall0110;
+    map[[width-1, 0]] = TileType::Wall0101;
+    map[[0, height-1]] = TileType::Wall1010;
+    map[[width-1, height-1]] = TileType::Wall1001;
     map
 }
 
@@ -205,13 +279,13 @@ fn generate_entities() -> Vec<Entity> {
 fn guard(x: i32, y: i32) -> Entity {
     Entity {
         pos: Vector2D::new(x, y),
-        tile: Tile { glyph: 36, color: color_preset::LIGHT_MAGENTA },
+        tile: Tile { glyph: 212, color: color_preset::LIGHT_MAGENTA },
     }
 }
 
 fn coin(x: i32, y: i32) -> Entity {
     Entity {
         pos: Vector2D::new(x, y),
-        tile: Tile { glyph: 110, color: color_preset::LIGHT_YELLOW },
+        tile: Tile { glyph: 158, color: color_preset::LIGHT_YELLOW },
     }
 }
