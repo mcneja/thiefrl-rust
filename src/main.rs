@@ -148,8 +148,14 @@ fn main() {
 impl Game {
     fn move_player(&mut self, dx: i32, dy: i32) {
         let player = &mut self.entities[self.player_id];
-        player.pos.x += dx;
-        player.pos.y += dy;
+        let x = player.pos.x + dx;
+        let y = player.pos.y + dy;
+        if x > 0 && x < (self.map.extents()[0] as i32) - 1 {
+            player.pos.x = x;
+        }
+        if y > 0 && y < (self.map.extents()[1] as i32) - 1 {
+            player.pos.y = y;
+        }
     }
 }
 
@@ -195,14 +201,14 @@ impl State for Game {
         match event {
             Event::Key(key, quicksilver::input::ButtonState::Pressed) =>
                 match key {
-                    Key::Left | Key::Numpad4 => self.move_player(-1, 0),
-                    Key::Right | Key::Numpad6 => self.move_player(1, 0),
-                    Key::Up | Key::Numpad8 => self.move_player(0, -1),
-                    Key::Down | Key::Numpad2 => self.move_player(0, 1),
-                    Key::Numpad7 => self.move_player(-1, -1),
-                    Key::Numpad9 => self.move_player(1, -1),
                     Key::Numpad1 => self.move_player(-1, 1),
+                    Key::Numpad2 | Key::Down => self.move_player(0, 1),
                     Key::Numpad3 => self.move_player(1, 1),
+                    Key::Numpad4 | Key::Left => self.move_player(-1, 0),
+                    Key::Numpad6 | Key::Right => self.move_player(1, 0),
+                    Key::Numpad7 => self.move_player(-1, -1),
+                    Key::Numpad8 | Key::Up => self.move_player(0, -1),
+                    Key::Numpad9 => self.move_player(1, -1),
                     Key::Escape => window.close(),
                     _ => ()
                 }
