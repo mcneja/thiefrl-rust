@@ -8,6 +8,8 @@ use quicksilver::{
 
 use multiarray::*;
 use vector2d::Vector2D;
+use std::cmp::min;
+use std::cmp::max;
 
 #[allow(dead_code)]
 mod color_preset {
@@ -69,50 +71,46 @@ enum TileType {
 	WindowEW,
 	DoorNS,
 	DoorEW,
-	SecretDoorNS,
-	SecretDoorEW,
 }
 
 fn tile_def(tile_type: &TileType) -> Tile {
     match tile_type {
-        TileType::GroundNormal     => Tile { glyph: 128, color: color_preset::LIGHT_GRAY },
-        TileType::GroundGravel     => Tile { glyph: 130, color: color_preset::LIGHT_GRAY },
-        TileType::GroundGrass      => Tile { glyph: 132, color: color_preset::DARK_GREEN },
-        TileType::GroundWater      => Tile { glyph: 134, color: color_preset::LIGHT_BLUE },
-        TileType::GroundMarble     => Tile { glyph: 136, color: color_preset::DARK_CYAN },
-        TileType::GroundWood       => Tile { glyph: 138, color: color_preset::DARK_BROWN },
-        TileType::GroundWoodCreaky => Tile { glyph: 138, color: color_preset::DARK_BROWN },
+        TileType::GroundNormal     => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::GroundGravel     => Tile { glyph: 130, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::GroundGrass      => Tile { glyph: 132, color: color_preset::DARK_GREEN, blocks_player: false },
+        TileType::GroundWater      => Tile { glyph: 134, color: color_preset::LIGHT_BLUE, blocks_player: false },
+        TileType::GroundMarble     => Tile { glyph: 136, color: color_preset::DARK_CYAN, blocks_player: false },
+        TileType::GroundWood       => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false },
+        TileType::GroundWoodCreaky => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false },
 
         //  NSEW
-        TileType::Wall0000 => Tile { glyph: 176, color: color_preset::LIGHT_GRAY },
-        TileType::Wall0001 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY },
-        TileType::Wall0010 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY },
-        TileType::Wall0011 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY },
-        TileType::Wall0100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY },
-        TileType::Wall0101 => Tile { glyph: 179, color: color_preset::LIGHT_GRAY },
-        TileType::Wall0110 => Tile { glyph: 182, color: color_preset::LIGHT_GRAY },
-        TileType::Wall0111 => Tile { glyph: 185, color: color_preset::LIGHT_GRAY },
-        TileType::Wall1000 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY },
-        TileType::Wall1001 => Tile { glyph: 180, color: color_preset::LIGHT_GRAY },
-        TileType::Wall1010 => Tile { glyph: 181, color: color_preset::LIGHT_GRAY },
-        TileType::Wall1011 => Tile { glyph: 184, color: color_preset::LIGHT_GRAY },
-        TileType::Wall1100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY },
-        TileType::Wall1101 => Tile { glyph: 186, color: color_preset::LIGHT_GRAY },
-        TileType::Wall1110 => Tile { glyph: 183, color: color_preset::LIGHT_GRAY },
-        TileType::Wall1111 => Tile { glyph: 187, color: color_preset::LIGHT_GRAY },
+        TileType::Wall0000 => Tile { glyph: 176, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall0001 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall0010 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall0011 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall0100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall0101 => Tile { glyph: 179, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall0110 => Tile { glyph: 182, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall0111 => Tile { glyph: 185, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall1000 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall1001 => Tile { glyph: 180, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall1010 => Tile { glyph: 181, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall1011 => Tile { glyph: 184, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall1100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall1101 => Tile { glyph: 186, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall1110 => Tile { glyph: 183, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        TileType::Wall1111 => Tile { glyph: 187, color: color_preset::LIGHT_GRAY, blocks_player: true },
 
-        TileType::OneWayWindowE => Tile { glyph: 196, color: color_preset::LIGHT_GRAY },
-        TileType::OneWayWindowW => Tile { glyph: 197, color: color_preset::LIGHT_GRAY },
-        TileType::OneWayWindowN => Tile { glyph: 198, color: color_preset::LIGHT_GRAY },
-        TileType::OneWayWindowS => Tile { glyph: 199, color: color_preset::LIGHT_GRAY },
-        TileType::PortcullisNS  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY },
-        TileType::PortcullisEW  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY },
-        TileType::WindowNS      => Tile { glyph: 189, color: color_preset::LIGHT_GRAY },
-        TileType::WindowEW      => Tile { glyph: 188, color: color_preset::LIGHT_GRAY },
-        TileType::DoorNS        => Tile { glyph: 189, color: color_preset::LIGHT_GRAY },
-        TileType::DoorEW        => Tile { glyph: 188, color: color_preset::LIGHT_GRAY },
-        TileType::SecretDoorNS  => Tile { glyph: 189, color: color_preset::LIGHT_GRAY },
-        TileType::SecretDoorEW  => Tile { glyph: 188, color: color_preset::LIGHT_GRAY },
+        TileType::OneWayWindowE => Tile { glyph: 196, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::OneWayWindowW => Tile { glyph: 197, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::OneWayWindowN => Tile { glyph: 198, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::OneWayWindowS => Tile { glyph: 199, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::PortcullisNS  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::PortcullisEW  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::WindowNS      => Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::WindowEW      => Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::DoorNS        => Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        TileType::DoorEW        => Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false },
     }
 }
 
@@ -120,6 +118,7 @@ fn tile_def(tile_type: &TileType) -> Tile {
 struct Tile {
     glyph: usize,
     color: Color,
+    blocks_player: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -145,18 +144,57 @@ fn main() {
     run::<Game>("ThiefRL 3", Vector::new(880, 760), settings);
 }
 
-impl Game {
-    fn move_player(&mut self, dx: i32, dy: i32) {
-        let player = &mut self.entities[self.player_id];
-        let x = player.pos.x + dx;
-        let y = player.pos.y + dy;
-        if x > 0 && x < (self.map.extents()[0] as i32) - 1 {
-            player.pos.x = x;
+fn move_player(game: &mut Game, dx: i32, dy: i32) {
+    let player = &mut game.entities[game.player_id];
+    let x = max(0, min((game.map.extents()[0] as i32) - 1, player.pos.x + dx));
+    let y = max(0, min((game.map.extents()[1] as i32) - 1, player.pos.y + dy));
+    let pos_new = Vector2D::new(x, y);
+
+	if !blocked(&game.map, &player.pos, &pos_new) {
+        player.pos = pos_new;
+    } else {
+        // Attempting to move diagonally; may be able to slide along a wall.
+
+        let pos_slide_v = Vector2D::new(player.pos.x, pos_new.y);
+        let pos_slide_h = Vector2D::new(pos_new.x, player.pos.y);
+
+        if !blocked(&game.map, &player.pos, &pos_slide_v) {
+            player.pos = pos_slide_v;
         }
-        if y > 0 && y < (self.map.extents()[1] as i32) - 1 {
-            player.pos.y = y;
+        else if !blocked(&game.map, &player.pos, &pos_slide_h) {
+            player.pos = pos_slide_h;
         }
+	}
+}
+
+fn on_level(map: &Array2D<TileType>, pos: &Vector2D<i32>) -> bool {
+	pos.x >= 0 && pos.y >= 0 && pos.x < (map.extents()[0] as i32) && pos.y < (map.extents()[1] as i32)
+}
+
+fn blocked(map: &Array2D<TileType>, pos_old: &Vector2D<i32>, pos_new: &Vector2D<i32>) -> bool {
+	if !on_level(map, pos_new) {
+		return true;
     }
+
+    let tile_type = &map[[pos_new.x as usize, pos_new.y as usize]];
+    let tile = tile_def(&tile_type);
+
+	if tile.blocks_player {
+		return true;
+    }
+
+    match tile_type {
+        TileType::OneWayWindowE => if pos_new.x <= pos_old.x { return true; },
+        TileType::OneWayWindowW => if pos_new.x >= pos_old.x { return true; },
+        TileType::OneWayWindowN => if pos_new.y <= pos_old.y { return true; },
+        TileType::OneWayWindowS => if pos_new.y >= pos_old.y { return true; },
+        _ => ()
+    }
+
+//	if (Guard::at(map, pos_new) || ShipCaptain::at(map, pos_new) || Leader::at(map, pos_new))
+//		return true;
+
+	false
 }
 
 impl State for Game {
@@ -170,7 +208,7 @@ impl State for Game {
         let player_id = entities.len();
         entities.push(Entity {
             pos: Vector2D::new(5, 3),
-            tile: Tile{ glyph: 208, color: color_preset::LIGHT_CYAN },
+            tile: Tile{ glyph: 208, color: color_preset::LIGHT_CYAN, blocks_player: false },
         });
 
         let tile_size_px = Vector::new(16, 16);
@@ -197,19 +235,20 @@ impl State for Game {
        })
     }
 
+    /// Handle input
     fn event(&mut self, event: &Event, window: &mut Window) -> Result<()> {
         match event {
             Event::Key(key, quicksilver::input::ButtonState::Pressed) =>
                 match key {
-                    Key::Numpad1 => self.move_player(-1, 1),
-                    Key::Numpad2 | Key::Down => self.move_player(0, 1),
-                    Key::Numpad3 => self.move_player(1, 1),
-                    Key::Numpad4 | Key::Left => self.move_player(-1, 0),
-                    Key::Numpad6 | Key::Right => self.move_player(1, 0),
-                    Key::Numpad7 => self.move_player(-1, -1),
-                    Key::Numpad8 | Key::Up => self.move_player(0, -1),
-                    Key::Numpad9 => self.move_player(1, -1),
-                    Key::Escape => window.close(),
+                    Key::Numpad1              => move_player(self, -1,  1),
+                    Key::Numpad2 | Key::Down  => move_player(self,  0,  1),
+                    Key::Numpad3              => move_player(self,  1,  1),
+                    Key::Numpad4 | Key::Left  => move_player(self, -1,  0),
+                    Key::Numpad6 | Key::Right => move_player(self,  1,  0),
+                    Key::Numpad7              => move_player(self, -1, -1),
+                    Key::Numpad8 | Key::Up    => move_player(self,  0, -1),
+                    Key::Numpad9              => move_player(self,  1, -1),
+                    Key::Escape               => window.close(),
                     _ => ()
                 }
             _ => ()
@@ -231,7 +270,7 @@ impl State for Game {
                 for y in 0..map.extents()[1] {
                     let pos = Vector::new(x as f32, y as f32);
                     let tile_type = &map[[x, y]];
-                    let tile = &tile_def(tile_type);
+                    let tile = tile_def(&tile_type);
                     let image = &tileset[tile.glyph];
                     let pos_px = offset_px + tile_size_px.times(pos);
                     window.draw(
@@ -285,13 +324,13 @@ fn generate_entities() -> Vec<Entity> {
 fn guard(x: i32, y: i32) -> Entity {
     Entity {
         pos: Vector2D::new(x, y),
-        tile: Tile { glyph: 212, color: color_preset::LIGHT_MAGENTA },
+        tile: Tile { glyph: 212, color: color_preset::LIGHT_MAGENTA, blocks_player: true },
     }
 }
 
 fn coin(x: i32, y: i32) -> Entity {
     Entity {
         pos: Vector2D::new(x, y),
-        tile: Tile { glyph: 158, color: color_preset::LIGHT_YELLOW },
+        tile: Tile { glyph: 158, color: color_preset::LIGHT_YELLOW, blocks_player: false },
     }
 }
