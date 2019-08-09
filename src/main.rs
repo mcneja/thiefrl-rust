@@ -34,6 +34,7 @@ mod color_preset {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[allow(dead_code)]
 enum TileType {
 	GroundNormal,
 	GroundGravel,
@@ -83,7 +84,7 @@ fn tile_def(tile_type: TileType) -> Tile {
         TileType::GroundWood       => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false },
         TileType::GroundWoodCreaky => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false },
 
-        //  NSEW
+                  //  NSEW
         TileType::Wall0000 => Tile { glyph: 176, color: color_preset::LIGHT_GRAY, blocks_player: true },
         TileType::Wall0001 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
         TileType::Wall0010 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
