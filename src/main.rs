@@ -1,3 +1,8 @@
+mod cell_grid;
+mod random_map;
+
+use crate::cell_grid::*;
+
 use quicksilver::{
     geom::{Rectangle, Vector},
     graphics::{Background::{Blended}, Color, Image},
@@ -6,10 +11,7 @@ use quicksilver::{
     Future, Result,
 };
 
-use multiarray::*;
-
 type Point = vector2d::Vector2D<i32>;
-type TileTypeGrid = Array2D<TileType>;
 
 #[allow(dead_code)]
 mod color_preset {
@@ -33,85 +35,44 @@ mod color_preset {
     pub const WHITE: Color = Color { r: 0.9961, g: 0.9961, b: 0.9961, a: 1.0 };
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[allow(dead_code)]
-enum TileType {
-	GroundNormal,
-	GroundGravel,
-	GroundGrass,
-	GroundWater,
-	GroundMarble,
-	GroundWood,
-	GroundWoodCreaky,
-
-	//  NSEW
-	Wall0000,
-	Wall0001,
-	Wall0010,
-	Wall0011,
-	Wall0100,
-	Wall0101,
-	Wall0110,
-	Wall0111,
-	Wall1000,
-	Wall1001,
-	Wall1010,
-	Wall1011,
-	Wall1100,
-	Wall1101,
-	Wall1110,
-	Wall1111,
-
-	OneWayWindowE,
-	OneWayWindowW,
-	OneWayWindowN,
-	OneWayWindowS,
-	PortcullisNS,
-	PortcullisEW,
-	WindowNS,
-	WindowEW,
-	DoorNS,
-	DoorEW,
-}
-
-fn tile_def(tile_type: TileType) -> Tile {
+fn tile_def(tile_type: CellType) -> Tile {
     match tile_type {
-        TileType::GroundNormal     => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::GroundGravel     => Tile { glyph: 130, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::GroundGrass      => Tile { glyph: 132, color: color_preset::DARK_GREEN, blocks_player: false },
-        TileType::GroundWater      => Tile { glyph: 134, color: color_preset::LIGHT_BLUE, blocks_player: false },
-        TileType::GroundMarble     => Tile { glyph: 136, color: color_preset::DARK_CYAN, blocks_player: false },
-        TileType::GroundWood       => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false },
-        TileType::GroundWoodCreaky => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false },
+        CellType::GroundNormal     => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::GroundGravel     => Tile { glyph: 130, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::GroundGrass      => Tile { glyph: 132, color: color_preset::DARK_GREEN, blocks_player: false },
+        CellType::GroundWater      => Tile { glyph: 134, color: color_preset::LIGHT_BLUE, blocks_player: false },
+        CellType::GroundMarble     => Tile { glyph: 136, color: color_preset::DARK_CYAN, blocks_player: false },
+        CellType::GroundWood       => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false },
+        CellType::GroundWoodCreaky => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false },
 
                   //  NSEW
-        TileType::Wall0000 => Tile { glyph: 176, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall0001 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall0010 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall0011 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall0100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall0101 => Tile { glyph: 179, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall0110 => Tile { glyph: 182, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall0111 => Tile { glyph: 185, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall1000 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall1001 => Tile { glyph: 180, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall1010 => Tile { glyph: 181, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall1011 => Tile { glyph: 184, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall1100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall1101 => Tile { glyph: 186, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall1110 => Tile { glyph: 183, color: color_preset::LIGHT_GRAY, blocks_player: true },
-        TileType::Wall1111 => Tile { glyph: 187, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall0000 => Tile { glyph: 176, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall0001 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall0010 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall0011 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall0100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall0101 => Tile { glyph: 179, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall0110 => Tile { glyph: 182, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall0111 => Tile { glyph: 185, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall1000 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall1001 => Tile { glyph: 180, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall1010 => Tile { glyph: 181, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall1011 => Tile { glyph: 184, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall1100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall1101 => Tile { glyph: 186, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall1110 => Tile { glyph: 183, color: color_preset::LIGHT_GRAY, blocks_player: true },
+        CellType::Wall1111 => Tile { glyph: 187, color: color_preset::LIGHT_GRAY, blocks_player: true },
 
-        TileType::OneWayWindowE => Tile { glyph: 196, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::OneWayWindowW => Tile { glyph: 197, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::OneWayWindowN => Tile { glyph: 198, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::OneWayWindowS => Tile { glyph: 199, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::PortcullisNS  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::PortcullisEW  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::WindowNS      => Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::WindowEW      => Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::DoorNS        => Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false },
-        TileType::DoorEW        => Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::OneWayWindowE => Tile { glyph: 196, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::OneWayWindowW => Tile { glyph: 197, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::OneWayWindowN => Tile { glyph: 198, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::OneWayWindowS => Tile { glyph: 199, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::PortcullisNS  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::PortcullisEW  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::WindowNS      => Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::WindowEW      => Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::DoorNS        => Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false },
+        CellType::DoorEW        => Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false },
     }
 }
 
@@ -129,7 +90,7 @@ struct Entity {
 }
 
 struct Game {
-    map: TileTypeGrid,
+    map: CellGrid,
     entities: Vec<Entity>,
     player_id: usize,
     tileset: Asset<Vec<Image>>,
@@ -166,37 +127,37 @@ fn move_player(game: &mut Game, dx: i32, dy: i32) {
 	}
 }
 
-fn on_level(map: &TileTypeGrid, pos: &Point) -> bool {
+fn on_level(map: &CellGrid, pos: &Point) -> bool {
     let size_x = map.extents()[0] as i32;
     let size_y = map.extents()[1] as i32;
 	pos.x >= 0 && pos.y >= 0 && pos.x < size_x && pos.y < size_y
 }
 
-fn blocked(map: &TileTypeGrid, pos_old: &Point, pos_new: &Point) -> bool {
+fn blocked(map: &CellGrid, pos_old: &Point, pos_new: &Point) -> bool {
 	if !on_level(map, pos_new) {
 		return true;
     }
 
-    let tile_type = map[[pos_new.x as usize, pos_new.y as usize]];
+    let tile_type = map[[pos_new.x as usize, pos_new.y as usize]].cell_type;
     let tile = tile_def(tile_type);
 
 	if tile.blocks_player {
 		return true;
     }
 
-    if tile_type == TileType::OneWayWindowE && pos_new.x <= pos_old.x {
+    if tile_type == CellType::OneWayWindowE && pos_new.x <= pos_old.x {
         return true;
     }
 
-    if tile_type == TileType::OneWayWindowW && pos_new.x >= pos_old.x {
+    if tile_type == CellType::OneWayWindowW && pos_new.x >= pos_old.x {
         return true;
     }
 
-    if tile_type == TileType::OneWayWindowN && pos_new.y <= pos_old.y {
+    if tile_type == CellType::OneWayWindowN && pos_new.y <= pos_old.y {
         return true;
     }
 
-    if tile_type == TileType::OneWayWindowS && pos_new.y >= pos_old.y {
+    if tile_type == CellType::OneWayWindowS && pos_new.y >= pos_old.y {
         return true;
     }
 
@@ -211,7 +172,7 @@ impl State for Game {
     fn new() -> Result<Self> {
         let tiles_file = "tiles.png";
 
-        let map = generate_map();
+        let map = random_map::generate_map();
         let mut entities = generate_entities();
 
         let player_id = entities.len();
@@ -270,7 +231,7 @@ impl State for Game {
         window.clear(color_preset::BLACK)?;
 
         let tile_size_px = self.tile_size_px;
-        let offset_px = Vector::new(50, 120);
+        let offset_px = Vector::new(0, 0);
 
         let map = &self.map;
         let entities = &self.entities;
@@ -278,7 +239,7 @@ impl State for Game {
             for x in 0..map.extents()[0] {
                 for y in 0..map.extents()[1] {
                     let pos = Vector::new(x as f32, y as f32);
-                    let tile_type = map[[x, y]];
+                    let tile_type = map[[x, y]].cell_type;
                     let tile = tile_def(tile_type);
                     let image = &tileset[tile.glyph];
                     let pos_px = offset_px + tile_size_px.times(pos);
@@ -302,24 +263,6 @@ impl State for Game {
 
         Ok(())
     }
-}
-
-fn generate_map() -> TileTypeGrid {
-    let map_size = vector2d::Vector2D::new(32, 32);
-    let mut map = TileTypeGrid::new([map_size.x, map_size.y], TileType::GroundNormal);
-    for x in 1..map_size.x-1 {
-        map[[x, 0]] = TileType::Wall0011;
-        map[[x, map_size.y-1]] = TileType::Wall0011;
-    }
-    for y in 1..map_size.y-1 {
-        map[[0, y]] = TileType::Wall1100;
-        map[[map_size.x-1, y]] = TileType::Wall1100;
-    }
-    map[[0, 0]] = TileType::Wall0110;
-    map[[map_size.x-1, 0]] = TileType::Wall0101;
-    map[[0, map_size.y-1]] = TileType::Wall1010;
-    map[[map_size.x-1, map_size.y-1]] = TileType::Wall1001;
-    map
 }
 
 fn generate_entities() -> Vec<Entity> {
