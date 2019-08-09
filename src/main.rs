@@ -33,7 +33,7 @@ mod color_preset {
     pub const WHITE: Color = Color { r: 0.9961, g: 0.9961, b: 0.9961, a: 1.0 };
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum TileType {
 	GroundNormal,
 	GroundGravel,
@@ -73,7 +73,7 @@ enum TileType {
 	DoorEW,
 }
 
-fn tile_def(tile_type: &TileType) -> Tile {
+fn tile_def(tile_type: TileType) -> Tile {
     match tile_type {
         TileType::GroundNormal     => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false },
         TileType::GroundGravel     => Tile { glyph: 130, color: color_preset::LIGHT_GRAY, blocks_player: false },
@@ -176,19 +176,27 @@ fn blocked(map: &Array2D<TileType>, pos_old: &Vector2D<i32>, pos_new: &Vector2D<
 		return true;
     }
 
-    let tile_type = &map[[pos_new.x as usize, pos_new.y as usize]];
-    let tile = tile_def(&tile_type);
+    let tile_type = map[[pos_new.x as usize, pos_new.y as usize]];
+    let tile = tile_def(tile_type);
 
 	if tile.blocks_player {
 		return true;
     }
 
-    match tile_type {
-        TileType::OneWayWindowE => if pos_new.x <= pos_old.x { return true; },
-        TileType::OneWayWindowW => if pos_new.x >= pos_old.x { return true; },
-        TileType::OneWayWindowN => if pos_new.y <= pos_old.y { return true; },
-        TileType::OneWayWindowS => if pos_new.y >= pos_old.y { return true; },
-        _ => ()
+    if tile_type == TileType::OneWayWindowE && pos_new.x <= pos_old.x {
+        return true;
+    }
+
+    if tile_type == TileType::OneWayWindowW && pos_new.x >= pos_old.x {
+        return true;
+    }
+
+    if tile_type == TileType::OneWayWindowN && pos_new.y <= pos_old.y {
+        return true;
+    }
+
+    if tile_type == TileType::OneWayWindowS && pos_new.y >= pos_old.y {
+        return true;
     }
 
 //	if (Guard::at(map, pos_new) || ShipCaptain::at(map, pos_new) || Leader::at(map, pos_new))
@@ -269,8 +277,8 @@ impl State for Game {
             for x in 0..map.extents()[0] {
                 for y in 0..map.extents()[1] {
                     let pos = Vector::new(x as f32, y as f32);
-                    let tile_type = &map[[x, y]];
-                    let tile = tile_def(&tile_type);
+                    let tile_type = map[[x, y]];
+                    let tile = tile_def(tile_type);
                     let image = &tileset[tile.glyph];
                     let pos_px = offset_px + tile_size_px.times(pos);
                     window.draw(
