@@ -7,9 +7,9 @@ use quicksilver::{
 };
 
 use multiarray::*;
-use vector2d::Vector2D;
-use std::cmp::min;
-use std::cmp::max;
+
+type Point = vector2d::Vector2D<i32>;
+type TileTypeGrid = Array2D<TileType>;
 
 #[allow(dead_code)]
 mod color_preset {
@@ -124,12 +124,12 @@ struct Tile {
 
 #[derive(Clone, Debug, PartialEq)]
 struct Entity {
-    pos: Vector2D<i32>,
+    pos: Point,
     tile: Tile,
 }
 
 struct Game {
-    map: Array2D<TileType>,
+    map: TileTypeGrid,
     entities: Vec<Entity>,
     player_id: usize,
     tileset: Asset<Vec<Image>>,
@@ -147,17 +147,15 @@ fn main() {
 
 fn move_player(game: &mut Game, dx: i32, dy: i32) {
     let player = &mut game.entities[game.player_id];
-    let x = max(0, min((game.map.extents()[0] as i32) - 1, player.pos.x + dx));
-    let y = max(0, min((game.map.extents()[1] as i32) - 1, player.pos.y + dy));
-    let pos_new = Vector2D::new(x, y);
+    let pos_new = Point::new(player.pos.x + dx, player.pos.y + dy);
 
 	if !blocked(&game.map, &player.pos, &pos_new) {
         player.pos = pos_new;
     } else {
         // Attempting to move diagonally; may be able to slide along a wall.
 
-        let pos_slide_v = Vector2D::new(player.pos.x, pos_new.y);
-        let pos_slide_h = Vector2D::new(pos_new.x, player.pos.y);
+        let pos_slide_v = Point::new(player.pos.x, pos_new.y);
+        let pos_slide_h = Point::new(pos_new.x, player.pos.y);
 
         if !blocked(&game.map, &player.pos, &pos_slide_v) {
             player.pos = pos_slide_v;
@@ -168,11 +166,13 @@ fn move_player(game: &mut Game, dx: i32, dy: i32) {
 	}
 }
 
-fn on_level(map: &Array2D<TileType>, pos: &Vector2D<i32>) -> bool {
-	pos.x >= 0 && pos.y >= 0 && pos.x < (map.extents()[0] as i32) && pos.y < (map.extents()[1] as i32)
+fn on_level(map: &TileTypeGrid, pos: &Point) -> bool {
+    let size_x = map.extents()[0] as i32;
+    let size_y = map.extents()[1] as i32;
+	pos.x >= 0 && pos.y >= 0 && pos.x < size_x && pos.y < size_y
 }
 
-fn blocked(map: &Array2D<TileType>, pos_old: &Vector2D<i32>, pos_new: &Vector2D<i32>) -> bool {
+fn blocked(map: &TileTypeGrid, pos_old: &Point, pos_new: &Point) -> bool {
 	if !on_level(map, pos_new) {
 		return true;
     }
@@ -211,12 +211,12 @@ impl State for Game {
     fn new() -> Result<Self> {
         let tiles_file = "tiles.png";
 
-        let map = generate_map(32, 32);
+        let map = generate_map();
         let mut entities = generate_entities();
 
         let player_id = entities.len();
         entities.push(Entity {
-            pos: Vector2D::new(5, 3),
+            pos: Point::new(5, 3),
             tile: Tile{ glyph: 208, color: color_preset::LIGHT_CYAN, blocks_player: false },
         });
 
@@ -304,20 +304,21 @@ impl State for Game {
     }
 }
 
-fn generate_map(width: usize, height: usize) -> Array2D<TileType> {
-    let mut map = Array2D::new([width, height], TileType::GroundNormal);
-    for x in 1..width-1 {
+fn generate_map() -> TileTypeGrid {
+    let map_size = vector2d::Vector2D::new(32, 32);
+    let mut map = TileTypeGrid::new([map_size.x, map_size.y], TileType::GroundNormal);
+    for x in 1..map_size.x-1 {
         map[[x, 0]] = TileType::Wall0011;
-        map[[x, height-1]] = TileType::Wall0011;
+        map[[x, map_size.y-1]] = TileType::Wall0011;
     }
-    for y in 1..height-1 {
+    for y in 1..map_size.y-1 {
         map[[0, y]] = TileType::Wall1100;
-        map[[width-1, y]] = TileType::Wall1100;
+        map[[map_size.x-1, y]] = TileType::Wall1100;
     }
     map[[0, 0]] = TileType::Wall0110;
-    map[[width-1, 0]] = TileType::Wall0101;
-    map[[0, height-1]] = TileType::Wall1010;
-    map[[width-1, height-1]] = TileType::Wall1001;
+    map[[map_size.x-1, 0]] = TileType::Wall0101;
+    map[[0, map_size.y-1]] = TileType::Wall1010;
+    map[[map_size.x-1, map_size.y-1]] = TileType::Wall1001;
     map
 }
 
@@ -332,14 +333,14 @@ fn generate_entities() -> Vec<Entity> {
 
 fn guard(x: i32, y: i32) -> Entity {
     Entity {
-        pos: Vector2D::new(x, y),
+        pos: Point::new(x, y),
         tile: Tile { glyph: 212, color: color_preset::LIGHT_MAGENTA, blocks_player: true },
     }
 }
 
 fn coin(x: i32, y: i32) -> Entity {
     Entity {
-        pos: Vector2D::new(x, y),
+        pos: Point::new(x, y),
         tile: Tile { glyph: 158, color: color_preset::LIGHT_YELLOW, blocks_player: false },
     }
 }
