@@ -1,6 +1,7 @@
 use crate::cell_grid::*;
+use rand::prelude::*;
 
-pub fn generate_map() -> CellGrid {
+pub fn generate_map(seed: u64) -> (CellGrid, Point) {
     let map_size = vector2d::Vector2D::new(32, 32);
     let default_cell = Cell {
         cell_type: CellType::GroundNormal,
@@ -24,5 +25,10 @@ pub fn generate_map() -> CellGrid {
     map[[map_size.x-1, 0]].cell_type = CellType::Wall0101;
     map[[0, map_size.y-1]].cell_type = CellType::Wall1010;
     map[[map_size.x-1, map_size.y-1]].cell_type = CellType::Wall1001;
-    map
+
+    let mut rng = rand_pcg::Pcg32::seed_from_u64(seed);
+    let player_x = rng.gen_range(1, (map_size.x - 1) as i32);
+    let player_y = rng.gen_range(1, (map_size.y - 1) as i32);
+
+    (map, Point::new(player_x, player_y))
 }

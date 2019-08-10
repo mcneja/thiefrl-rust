@@ -8,4 +8,6 @@ edition = "2018"
 # More features: "collisions", "complex_shapes", "immi_ui", "sounds", gamepads
 quicksilver = { version = "0.3.6", default-features = false, features = ["fonts", "saving"] }
 multiarray = { version = "0.1.3" }
+rand = { version = "0.7.0" }
+rand_pcg = { version = "0.2.0" }
 vector2d = { version = "2.2.0" }

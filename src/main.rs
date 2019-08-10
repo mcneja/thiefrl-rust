@@ -10,8 +10,7 @@ use quicksilver::{
     lifecycle::{run, Asset, Event, Settings, State, Window},
     Future, Result,
 };
-
-type Point = vector2d::Vector2D<i32>;
+use std::time::SystemTime;
 
 #[allow(dead_code)]
 mod color_preset {
@@ -172,12 +171,18 @@ impl State for Game {
     fn new() -> Result<Self> {
         let tiles_file = "tiles.png";
 
-        let map = random_map::generate_map();
+        let random_seed: u64 =
+            match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(n) => n.as_secs(),
+                Err(_) => 0,
+            };
+
+        let (map, pos_player) = random_map::generate_map(random_seed);
         let mut entities = generate_entities();
 
         let player_id = entities.len();
         entities.push(Entity {
-            pos: Point::new(5, 3),
+            pos: pos_player,
             tile: Tile{ glyph: 208, color: color_preset::LIGHT_CYAN, blocks_player: false },
         });
 
@@ -210,15 +215,16 @@ impl State for Game {
         match event {
             Event::Key(key, quicksilver::input::ButtonState::Pressed) =>
                 match key {
-                    Key::Numpad1              => move_player(self, -1,  1),
-                    Key::Numpad2 | Key::Down  => move_player(self,  0,  1),
-                    Key::Numpad3              => move_player(self,  1,  1),
-                    Key::Numpad4 | Key::Left  => move_player(self, -1,  0),
-                    Key::Numpad6 | Key::Right => move_player(self,  1,  0),
-                    Key::Numpad7              => move_player(self, -1, -1),
-                    Key::Numpad8 | Key::Up    => move_player(self,  0, -1),
-                    Key::Numpad9              => move_player(self,  1, -1),
-                    Key::Escape               => window.close(),
+                    Key::Numpad1 | Key::End      => move_player(self, -1,  1),
+                    Key::Numpad2 | Key::Down     => move_player(self,  0,  1),
+                    Key::Numpad3 | Key::PageDown => move_player(self,  1,  1),
+                    Key::Numpad4 | Key::Left     => move_player(self, -1,  0),
+                    Key::Numpad5                 => move_player(self,  0,  0),
+                    Key::Numpad6 | Key::Right    => move_player(self,  1,  0),
+                    Key::Numpad7 | Key::Home     => move_player(self, -1, -1),
+                    Key::Numpad8 | Key::Up       => move_player(self,  0, -1),
+                    Key::Numpad9 | Key::PageUp   => move_player(self,  1, -1),
+                    Key::Escape                  => window.close(),
                     _ => ()
                 }
             _ => ()
