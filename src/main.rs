@@ -10,7 +10,6 @@ use quicksilver::{
     lifecycle::{run, Asset, Event, Settings, State, Window},
     Future, Result,
 };
-use std::time::SystemTime;
 
 #[allow(dead_code)]
 mod color_preset {
@@ -255,7 +254,7 @@ impl State for Game {
             }
             for entity in entities.iter() {
                 let image = &tileset[entity.tile.glyph];
-                let pos = Vector::new(entity.pos.x, ((map_size_y - 1) as i32 - entity.pos.y));
+                let pos = Vector::new(entity.pos.x, (map_size_y - 1) as i32 - entity.pos.y);
                 let pos_px = offset_px + pos.times(tile_size_px);
                 window.draw(
                     &Rectangle::new(pos_px, image.area().size()),

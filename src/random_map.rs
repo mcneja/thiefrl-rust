@@ -486,7 +486,7 @@ fn create_exits(
 	inside: &Array2D<bool>,
 	offset_x: &Array2D<i32>,
 	offset_y: &Array2D<i32>,
-	map: &mut CellGrid
+	mut map: &mut CellGrid
 ) -> (Vec<Room>, Vec<Adjacency>, Point) {
 	// Make a set of rooms.
 
@@ -531,31 +531,30 @@ fn create_exits(
 	// Compute a list of room adjacencies.
 
 	let mut adjacencies = compute_adjacencies(mirror_x, mirror_y, &inside, &offset_x, &offset_y, &room_index);
-    adjacencies.shuffle(&mut rng);
 	store_adjacencies_in_rooms(&adjacencies, &mut rooms);
 
 	// Connect rooms together.
 
 	let pos_start = connect_rooms(&mut rng, &mut rooms, &mut adjacencies);
 
-    /*
-
 	// Assign types to the rooms.
 
-	assignRoomTypes(room_index, adjacencies, rooms);
+	assign_room_types(&room_index, &adjacencies, &mut rooms);
+
+    /*
 
 	// Generate pathing information.
 
 	generatePatrolRoutes(rooms, adjacencies, map);
+    */
 
 	// Render doors and windows.
 
-	renderWalls(rooms, adjacencies, map);
+	render_walls(&mut rng, &rooms, &adjacencies, &mut map);
 
 	// Render floors.
 
-	renderRooms(level, rooms, map);
-    */
+	render_rooms(level, &rooms, &mut map, &mut rng);
 
     (rooms, adjacencies, pos_start)
 }
@@ -936,7 +935,30 @@ fn store_adjacencies_in_rooms(adjacencies: &Vec<Adjacency>, rooms: &mut Vec<Room
 	}
 }
 
+fn get_edge_sets(mut rng: &mut impl Rng, adjacencies: &[Adjacency]) -> Vec<Vec<usize>> {
+    let mut edge_sets = Vec::with_capacity(adjacencies.len());
+
+    for (i, adj) in adjacencies.iter().enumerate() {
+        let j = adj.next_matching;
+        if j >= i {
+            if j > i {
+                edge_sets.push(vec![i, j]);
+            } else {
+                edge_sets.push(vec![i]);
+            }
+        }
+    }
+
+    edge_sets.shuffle(&mut rng);
+
+    edge_sets
+}
+
 fn connect_rooms(mut rng: &mut impl Rng, mut rooms: &mut Vec<Room>, adjacencies: &mut Vec<Adjacency>) -> Point {
+
+    // Collect sets of edges that are mirrors of each other
+
+    let edge_sets = get_edge_sets(&mut rng, &adjacencies);
 
 	// Connect all adjacent courtyard rooms together.
 
@@ -953,81 +975,102 @@ fn connect_rooms(mut rng: &mut impl Rng, mut rooms: &mut Vec<Room>, adjacencies:
         join_groups(&mut rooms, group0, group1);
 	}
 
-    // Make a list of edges with the symmetric matching ones paired up so they can be processed at the same time.
-
-    let mut adjacency_order: Vec<usize> = (0..adjacencies.len()).collect();
-    adjacency_order.shuffle(&mut rng);
-
-    /*
-
 	// Connect all the interior rooms with doors.
 
-    for (i, adj) in adjacencies.iter_mut().enumerate() {
-		let i0 = adj.room_left;
-		let i1 = adj.room_right;
-		if rooms[i0].room_type != RoomType::Interior || rooms[i1].room_type != RoomType::Interior {
-			continue;
+    for edge_set in &edge_sets {
+
+        let mut added_door = false;
+
+        {
+            let adj = &mut adjacencies[edge_set[0]];
+
+            let i0 = adj.room_left;
+            let i1 = adj.room_right;
+
+            if rooms[i0].room_type != RoomType::Interior || rooms[i1].room_type != RoomType::Interior {
+                continue;
+            }
+
+            let group0 = rooms[i0].group;
+            let group1 = rooms[i1].group;
+
+            if group0 != group1 || rng.gen_range(0, 3) == 0 {
+                adj.door = true;
+                added_door = true;
+                join_groups(&mut rooms, group0, group1);
+            }
         }
 
-		let group0 = rooms[i0].group;
-		let group1 = rooms[i1].group;
+        if added_door {
+            for i in 1..edge_set.len() {
+                let adj = &mut adjacencies[edge_set[i]];
 
-        let j = adj.next_matching;
+                let i0 = adj.room_left;
+                let i1 = adj.room_right;
 
-        adj.door =
-            if j < i {
-                adjacencies[j].door
-            } else {
-                group0 != group1 || rng.gen_range(0, 3) == 0
-            };
+                let group0 = rooms[i0].group;
+                let group1 = rooms[i1].group;
 
-        if adj.door {
-    		join_groups(&mut rooms, group0, group1);
+                adj.door = true;
+                join_groups(&mut rooms, group0, group1);
+            }
         }
-	}
+    }
 
 	// Create doors between the interiors and the courtyard areas.
 
-    for (i, adj) in adjacencies.iter_mut().enumerate() {
-		let i0 = adj.room_left;
-		let i1 = adj.room_right;
+    for edge_set in &edge_sets {
 
-		let roomType0 = rooms[i0].room_type;
-		let roomType1 = rooms[i1].room_type;
+        let mut added_door = false;
 
-		if roomType0 == roomType1 {
-			continue;
+        {
+            let adj = &mut adjacencies[edge_set[0]];
+
+            let i0 = adj.room_left;
+            let i1 = adj.room_right;
+
+            let room_type0 = rooms[i0].room_type;
+            let room_type1 = rooms[i1].room_type;
+
+            if room_type0 == room_type1 {
+                continue;
+            }
+
+            if room_type0 == RoomType::Exterior || room_type1 == RoomType::Exterior {
+                continue;
+            }
+
+            let group0 = rooms[i0].group;
+            let group1 = rooms[i1].group;
+
+            if group0 != group1 || rng.gen_range(0, 3) == 0 {
+                adj.door = true;
+                added_door = true;
+                join_groups(&mut rooms, group0, group1);
+            }
         }
 
-		if roomType0 == RoomType::Exterior || roomType1 == RoomType::Exterior {
-			continue;
+        if added_door {
+            for i in 1..edge_set.len() {
+                let adj = &mut adjacencies[edge_set[i]];
+
+                let i0 = adj.room_left;
+                let i1 = adj.room_right;
+
+                let group0 = rooms[i0].group;
+                let group1 = rooms[i1].group;
+
+                adj.door = true;
+                join_groups(&mut rooms, group0, group1);
+            }
         }
-
-		let group0 = rooms[i0].group;
-		let group1 = rooms[i1].group;
-
-        let j = adj.next_matching;
-
-        adj.door =
-            if j < i {
-                adjacencies[j].door
-            } else {
-                group0 != group1 || rng.gen_range(0, 3) == 0
-            };
-
-        if adj.door {
-    		join_groups(&mut rooms, group0, group1);
-        }
-	}
-
-    */
+    }
 
 	// Create the door to the surrounding exterior. It must be on the south side.
 
     let mut pos_start = Point::new(0, 0);
 
     /*
-
     for (i, adj) in adjacencies.iter_mut().enumerate() {
 
 		if adj.dir.x == 0 {
@@ -1064,7 +1107,6 @@ fn connect_rooms(mut rng: &mut impl Rng, mut rooms: &mut Vec<Room>, adjacencies:
 
 		break;
 	}
-
     */
 
     pos_start
@@ -1078,4 +1120,378 @@ fn join_groups(rooms: &mut Vec<Room>, group_from: usize, group_to: usize) {
             }
         }
     }
+}
+
+fn assign_room_types(room_index: &Array2D<usize>, adjacencies: &[Adjacency], rooms: &mut [Room]) {
+
+    /*
+
+	// Assign rooms depth based on distance from the bottom row of rooms.
+
+	const int unvisited = rooms.size();
+
+	rooms[0].depth = 0;
+
+	for (size_t i = 1; i < rooms.size(); ++i)
+		rooms[i].depth = unvisited;
+
+	std::vector<size_t> roomsToVisit;
+	roomsToVisit.reserve(rooms.size());
+
+	for (int x = 0; x < room_index.width(); ++x)
+	{
+		int iRoom = room_index(x, 0);
+
+		rooms[iRoom].depth = 1;
+		roomsToVisit.push_back(iRoom);
+	}
+
+	// Visit rooms in breadth-first order, assigning them distances from the seed rooms.
+
+	for (size_t iiRoom = 0; iiRoom < roomsToVisit.size(); ++iiRoom)
+	{
+		size_t iRoom = roomsToVisit[iiRoom];
+		Room & room = rooms[iRoom];
+
+		for (size_t iAdj : room.edges)
+		{
+			const Adjacency & adj = adjacencies[iAdj];
+
+			if (!adj.door)
+				continue;
+
+			size_t iRoomNeighbor = (adj.roomLeft == iRoom) ? adj.roomRight : adj.roomLeft;
+
+			if (rooms[iRoomNeighbor].depth == unvisited)
+			{
+				rooms[iRoomNeighbor].depth = room.depth + 1;
+				roomsToVisit.push_back(iRoomNeighbor);
+			}
+		}
+	}
+
+	// Assign master-suite room type to the inner rooms.
+
+	int maxDepth = 0;
+	for (const Room & room : rooms)
+	{
+		maxDepth = max(maxDepth, room.depth);
+	}
+
+	int targetNumMasterRooms = (room_index.width() * room_index.height()) / 4;
+
+	int numMasterRooms = 0;
+
+	for (int depth = maxDepth; depth > 0; --depth)
+	{
+		for (Room & room : rooms)
+		{
+			if (room.type != room_type_interior)
+				continue;
+
+			if (room.depth != depth)
+				continue;
+
+			room.type = room_type_master_suite;
+			++numMasterRooms;
+		}
+
+		if (numMasterRooms >= targetNumMasterRooms)
+			break;
+	}
+
+    */
+}
+
+const ONE_WAY_WINDOW: [CellType; 5] = [
+	CellType::OneWayWindowS,
+	CellType::OneWayWindowE,
+	CellType::OneWayWindowE, // not used
+	CellType::OneWayWindowW,
+	CellType::OneWayWindowN,
+];
+
+fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, map: &mut CellGrid) {
+
+	// Render grass connecting courtyard rooms.
+
+    for adj in adjacencies.iter() {
+		let type0 = rooms[adj.room_left].room_type;
+		let type1 = rooms[adj.room_right].room_type;
+
+		if type0 != RoomType::Courtyard || type1 != RoomType::Courtyard {
+			continue;
+        }
+
+        for j in 0..adj.length {
+			let p: Point = adj.origin + adj.dir * j;
+			map[[p.x as usize, p.y as usize]].cell_type = CellType::GroundGrass;
+		}
+    }
+
+	// Render doors and windows for the rest of the walls.
+
+    for i in 0..adjacencies.len() {
+		let adj0 = &adjacencies[i];
+
+		let type0 = rooms[adj0.room_left].room_type;
+		let type1 = rooms[adj0.room_right].room_type;
+
+		if type0 == RoomType::Courtyard && type1 == RoomType::Courtyard {
+			continue;
+        }
+
+		let j = adj0.next_matching;
+
+		if j < i {
+			continue;
+        }
+
+		let offset =
+            if j == i {
+                adj0.length / 2
+            } else if adj0.length > 2 {
+                1 + rng.gen_range(0, adj0.length - 2)
+            } else {
+                rng.gen_range(0, adj0.length)
+            };
+
+        let mut walls: Vec<&Adjacency> = Vec::with_capacity(2);
+        walls.push(adj0);
+
+        if j != i {
+            walls.push(&adjacencies[j]);
+        }
+
+		if !adj0.door && type0 != type1 {
+			if type0 == RoomType::Exterior || type1 == RoomType::Exterior {
+				if (adj0.length & 1) != 0 {
+					let k = adj0.length / 2;
+
+                    for a in &walls {
+						let p = a.origin + a.dir * k;
+
+                        let dir =
+                            if rooms[a.room_right].room_type == RoomType::Exterior {
+                                -a.dir
+                            } else {
+                                a.dir
+                            };
+
+						map[[p.x as usize, p.y as usize]].cell_type = ONE_WAY_WINDOW[(2 * dir.x + dir.y + 2) as usize];
+					}
+				}
+			} else if type0 == RoomType::Courtyard || type1 == RoomType::Courtyard {
+                let mut k = rng.gen_range(0, 2);
+				let k_end = (adj0.length + 1) / 2;
+
+                while k < k_end {
+					for a in &walls {
+						let dir =
+                            if rooms[a.room_right].room_type == RoomType::Courtyard {
+                                -a.dir
+                            } else {
+                                a.dir
+                            };
+
+						let window_type = ONE_WAY_WINDOW[(2 * dir.x + dir.y + 2) as usize];
+
+						let p: Point = a.origin + a.dir * k;
+						let q: Point = a.origin + a.dir * (a.length - (k + 1));
+
+						map[[p.x as usize, p.y as usize]].cell_type = window_type;
+						map[[q.x as usize, q.y as usize]].cell_type = window_type;
+					}
+                    k += 2;
+				}
+			}
+		}
+
+		let install_master_suite_door = rng.gen_range(0, 100) < 40;
+
+		for a in &walls {
+			if !a.door {
+				continue;
+            }
+
+			let p = a.origin + a.dir * offset;
+
+			let orient_ns = a.dir.x == 0;
+
+			map[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::DoorNS} else {CellType::DoorEW};
+
+			let room_type_left = rooms[a.room_left].room_type;
+			let room_type_right = rooms[a.room_right].room_type;
+
+			if room_type_left == RoomType::Exterior || room_type_right == RoomType::Exterior {
+                map[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::PortcullisNS} else {CellType::PortcullisEW};
+//				place_portcullis(map, p, orient_ns);
+            } else if room_type_left != RoomType::MasterSuite || room_type_right != RoomType::MasterSuite || install_master_suite_door {
+                map[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::DoorNS} else {CellType::DoorEW};
+//				place_door(map, p, orient_ns);
+            }
+		}
+	}
+}
+
+fn render_rooms(level: i32, rooms: &Vec<Room>, map: &mut CellGrid, rng: &mut impl Rng) {
+    for i_room in 1..rooms.len() {
+		let room = &rooms[i_room];
+
+		let cell_type =
+            if room.room_type == RoomType::Courtyard {
+                CellType::GroundGrass
+            } else if room.room_type == RoomType::MasterSuite {
+                CellType::GroundMarble
+            } else {
+                CellType::GroundWood
+            };
+
+		for x in room.pos_min.x..room.pos_max.x {
+			for y in room.pos_min.y..room.pos_max.y {
+				let t =
+                    if cell_type == CellType::GroundWood && level > 3 && rng.gen_range(0, 50) == 0 {
+                        CellType::GroundWoodCreaky
+                    } else {
+                        cell_type
+                    };
+
+				map[[x as usize, y as usize]].cell_type = t;
+			}
+		}
+
+		let dx = room.pos_max.x - room.pos_min.x;
+		let dy = room.pos_max.y - room.pos_min.y;
+
+		if room.room_type == RoomType::Courtyard {
+			if dx >= 5 && dy >= 5 {
+				for x in room.pos_min.x + 1 .. room.pos_max.x - 1 {
+					for y in room.pos_min.y + 1 .. room.pos_max.y - 1 {
+						map[[x as usize, y as usize]].cell_type = CellType::GroundWater;
+					}
+				}
+			} else if dx >= 2 && dy >= 2 {
+				try_place_bush(map, room.pos_min.x, room.pos_min.y);
+				try_place_bush(map, room.pos_max.x - 1, room.pos_min.y);
+				try_place_bush(map, room.pos_min.x, room.pos_max.y - 1);
+				try_place_bush(map, room.pos_max.x - 1, room.pos_max.y - 1);
+			}
+		} else if room.room_type == RoomType::Interior || room.room_type == RoomType::MasterSuite {
+			if dx >= 5 && dy >= 5 {
+				if room.room_type == RoomType::MasterSuite {
+					for x in 2..dx-2 {
+						for y in 2..dy-2 {
+							map[[(room.pos_min.x + x) as usize, (room.pos_min.y + y) as usize]].cell_type = CellType::GroundWater;
+						}
+					}
+				}
+
+				map[[(room.pos_min.x + 1) as usize, (room.pos_min.y + 1) as usize]].cell_type = CellType::Wall0000;
+				map[[(room.pos_max.x - 2) as usize, (room.pos_min.y + 1) as usize]].cell_type = CellType::Wall0000;
+				map[[(room.pos_min.x + 1) as usize, (room.pos_max.y - 2) as usize]].cell_type = CellType::Wall0000;
+				map[[(room.pos_max.x - 2) as usize, (room.pos_max.y - 2) as usize]].cell_type = CellType::Wall0000;
+			} else if dx == 5 && dy >= 3 && (room.room_type == RoomType::Interior || rng.gen_range(0, 3) == 0) {
+				for y in 1..dy-1 {
+					place_chair(map, room.pos_min.x + 1, room.pos_min.y + y);
+					place_table(map, room.pos_min.x + 2, room.pos_min.y + y);
+					place_chair(map, room.pos_min.x + 3, room.pos_min.y + y);
+				}
+			} else if dy == 5 && dx >= 3 && (room.room_type == RoomType::Interior || rng.gen_range(0, 3) == 0) {
+				for x in 1..dx-1 {
+					place_chair(map, room.pos_min.x + x, room.pos_min.y + 1);
+					place_table(map, room.pos_min.x + x, room.pos_min.y + 2);
+					place_chair(map, room.pos_min.x + x, room.pos_min.y + 3);
+				}
+			} else if dx > dy && (dy & 1) == 1 && rng.gen_range(0, 3) != 0 {
+				let y = room.pos_min.y + dy / 2;
+
+				if room.room_type == RoomType::Interior {
+					try_place_table(map, room.pos_min.x + 1, y);
+					try_place_table(map, room.pos_max.x - 2, y);
+				} else {
+					try_place_chair(map, room.pos_min.x + 1, y);
+					try_place_chair(map, room.pos_max.x - 2, y);
+				}
+			} else if dy > dx && (dx & 1) == 1 && rng.gen_range(0, 3) != 0 {
+				let x = room.pos_min.x + dx / 2;
+
+				if room.room_type == RoomType::Interior {
+					try_place_table(map, x, room.pos_min.y + 1);
+					try_place_table(map, x, room.pos_max.y - 2);
+				} else {
+					try_place_chair(map, x, room.pos_min.y + 1);
+					try_place_chair(map, x, room.pos_max.y - 2);
+				}
+			} else if dx > 3 && dy > 3 {
+				if room.room_type == RoomType::Interior {
+					try_place_table(map, room.pos_min.x, room.pos_min.y);
+					try_place_table(map, room.pos_max.x - 1, room.pos_min.y);
+					try_place_table(map, room.pos_min.x, room.pos_max.y - 1);
+					try_place_table(map, room.pos_max.x - 1, room.pos_max.y - 1);
+				} else {
+					try_place_chair(map, room.pos_min.x, room.pos_min.y);
+					try_place_chair(map, room.pos_max.x - 1, room.pos_min.y);
+					try_place_chair(map, room.pos_min.x, room.pos_max.y - 1);
+					try_place_chair(map, room.pos_max.x - 1, room.pos_max.y - 1);
+				}
+			}
+		}
+	}
+}
+
+fn door_adjacent(map: &CellGrid, x: i32, y: i32) -> bool {
+	if map[[(x - 1) as usize, y as usize]].cell_type >= CellType::PortcullisNS {
+		return true;
+    }
+
+	if map[[(x + 1) as usize, y as usize]].cell_type >= CellType::PortcullisNS {
+		return true;
+    }
+
+	if map[[x as usize, (y - 1) as usize]].cell_type >= CellType::PortcullisNS {
+		return true;
+    }
+
+	if map[[x as usize, (y + 1) as usize]].cell_type >= CellType::PortcullisNS {
+		return true;
+    }
+
+    false
+}
+
+fn try_place_bush(map: &CellGrid, x: i32, y: i32) {
+	if map[[x as usize, y as usize]].cell_type != CellType::GroundGrass {
+		return;
+    }
+
+    if door_adjacent(&map, x, y) {
+        return;
+    }
+
+	place_bush(&map, x, y);
+}
+
+fn try_place_table(map: &CellGrid, x: i32, y: i32) {
+    if door_adjacent(&map, x, y) {
+        return;
+    }
+
+	place_table(&map, x, y);
+}
+
+fn try_place_chair(map: &CellGrid, x: i32, y: i32) {
+    if door_adjacent(&map, x, y) {
+        return;
+    }
+
+	place_chair(&map, x, y);
+}
+
+fn place_chair(map: &CellGrid, x: i32, y: i32) {
+}
+
+fn place_table(map: &CellGrid, x: i32, y: i32) {
+}
+
+fn place_bush(map: &CellGrid, x: i32, y: i32) {
 }
