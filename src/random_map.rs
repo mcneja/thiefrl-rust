@@ -1122,85 +1122,82 @@ fn join_groups(rooms: &mut Vec<Room>, group_from: usize, group_to: usize) {
     }
 }
 
-fn assign_room_types(room_index: &Array2D<usize>, adjacencies: &[Adjacency], rooms: &mut [Room]) {
-
-    /*
+fn assign_room_types(room_index: &Array2D<usize>, adjacencies: &Vec<Adjacency>, rooms: &mut Vec<Room>) {
 
 	// Assign rooms depth based on distance from the bottom row of rooms.
 
-	const int unvisited = rooms.size();
+	let unvisited = rooms.len();
 
 	rooms[0].depth = 0;
 
-	for (size_t i = 1; i < rooms.size(); ++i)
-		rooms[i].depth = unvisited;
+    for i in 1..rooms.len() {
+        rooms[i].depth = unvisited;
+    }
 
-	std::vector<size_t> roomsToVisit;
-	roomsToVisit.reserve(rooms.size());
+    let mut rooms_to_visit: Vec<usize> = Vec::with_capacity(rooms.len());
 
-	for (int x = 0; x < room_index.width(); ++x)
-	{
-		int iRoom = room_index(x, 0);
-
-		rooms[iRoom].depth = 1;
-		roomsToVisit.push_back(iRoom);
-	}
+    for x in 0..room_index.extents()[0] {
+        let i_room = room_index[[x, 0]];
+        rooms[i_room].depth = 1;
+        rooms_to_visit.push(i_room);
+    }
 
 	// Visit rooms in breadth-first order, assigning them distances from the seed rooms.
 
-	for (size_t iiRoom = 0; iiRoom < roomsToVisit.size(); ++iiRoom)
-	{
-		size_t iRoom = roomsToVisit[iiRoom];
-		Room & room = rooms[iRoom];
+    let mut ii_room = 0;
+    while ii_room < rooms_to_visit.len() {
+		let i_room = rooms_to_visit[ii_room];
 
-		for (size_t iAdj : room.edges)
-		{
-			const Adjacency & adj = adjacencies[iAdj];
+        for i_adj in &rooms[i_room].edges.clone() {
+			let adj: &Adjacency = &adjacencies[*i_adj];
 
-			if (!adj.door)
+			if !adj.door {
 				continue;
+            }
 
-			size_t iRoomNeighbor = (adj.roomLeft == iRoom) ? adj.roomRight : adj.roomLeft;
+			let i_room_neighbor = if adj.room_left == i_room {adj.room_right} else {adj.room_left};
 
-			if (rooms[iRoomNeighbor].depth == unvisited)
-			{
-				rooms[iRoomNeighbor].depth = room.depth + 1;
-				roomsToVisit.push_back(iRoomNeighbor);
+			if rooms[i_room_neighbor].depth == unvisited {
+				rooms[i_room_neighbor].depth = rooms[i_room].depth + 1;
+				rooms_to_visit.push(i_room_neighbor);
 			}
-		}
-	}
+        }
+
+        ii_room += 1;
+    }
 
 	// Assign master-suite room type to the inner rooms.
 
-	int maxDepth = 0;
-	for (const Room & room : rooms)
-	{
-		maxDepth = max(maxDepth, room.depth);
+	let mut max_depth = 0;
+	for room in rooms.iter() {
+		max_depth = max(max_depth, room.depth);
 	}
 
-	int targetNumMasterRooms = (room_index.width() * room_index.height()) / 4;
+	let target_num_master_rooms = (room_index.extents()[0] * room_index.extents()[1]) / 4;
 
-	int numMasterRooms = 0;
+	let mut num_master_rooms = 0;
 
-	for (int depth = maxDepth; depth > 0; --depth)
-	{
-		for (Room & room : rooms)
-		{
-			if (room.type != room_type_interior)
+    let mut depth = max_depth;
+    while depth > 0 {
+		for room in rooms.iter_mut() {
+			if room.room_type != RoomType::Interior {
 				continue;
+            }
 
-			if (room.depth != depth)
+			if room.depth != depth {
 				continue;
+            }
 
-			room.type = room_type_master_suite;
-			++numMasterRooms;
+			room.room_type = RoomType::MasterSuite;
+			num_master_rooms += 1;
 		}
 
-		if (numMasterRooms >= targetNumMasterRooms)
+		if num_master_rooms >= target_num_master_rooms {
 			break;
-	}
+        }
 
-    */
+        depth -= 1;
+	}
 }
 
 const ONE_WAY_WINDOW: [CellType; 5] = [
