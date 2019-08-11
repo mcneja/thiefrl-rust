@@ -171,11 +171,7 @@ impl State for Game {
     fn new() -> Result<Self> {
         let tiles_file = "tiles.png";
 
-        let random_seed: u64 =
-            match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                Ok(n) => n.as_secs(),
-                Err(_) => 0,
-            };
+        let random_seed = rand::random::<u64>();
 
         let (map, pos_player) = random_map::generate_map(random_seed);
         let mut entities = generate_entities();
@@ -215,15 +211,15 @@ impl State for Game {
         match event {
             Event::Key(key, quicksilver::input::ButtonState::Pressed) =>
                 match key {
-                    Key::Numpad1 | Key::End      => move_player(self, -1,  1),
-                    Key::Numpad2 | Key::Down     => move_player(self,  0,  1),
-                    Key::Numpad3 | Key::PageDown => move_player(self,  1,  1),
+                    Key::Numpad1 | Key::End      => move_player(self, -1, -1),
+                    Key::Numpad2 | Key::Down     => move_player(self,  0, -1),
+                    Key::Numpad3 | Key::PageDown => move_player(self,  1, -1),
                     Key::Numpad4 | Key::Left     => move_player(self, -1,  0),
                     Key::Numpad5                 => move_player(self,  0,  0),
                     Key::Numpad6 | Key::Right    => move_player(self,  1,  0),
-                    Key::Numpad7 | Key::Home     => move_player(self, -1, -1),
-                    Key::Numpad8 | Key::Up       => move_player(self,  0, -1),
-                    Key::Numpad9 | Key::PageUp   => move_player(self,  1, -1),
+                    Key::Numpad7 | Key::Home     => move_player(self, -1,  1),
+                    Key::Numpad8 | Key::Up       => move_player(self,  0,  1),
+                    Key::Numpad9 | Key::PageUp   => move_player(self,  1,  1),
                     Key::Escape                  => window.close(),
                     _ => ()
                 }
@@ -240,13 +236,15 @@ impl State for Game {
         let offset_px = Vector::new(0, 0);
 
         let map = &self.map;
+        let map_size_x = map.extents()[0];
+        let map_size_y = map.extents()[1];
         let entities = &self.entities;
         self.tileset.execute(|tileset| {
-            for x in 0..map.extents()[0] {
-                for y in 0..map.extents()[1] {
-                    let pos = Vector::new(x as f32, y as f32);
-                    let tile_type = map[[x, y]].cell_type;
-                    let tile = tile_def(tile_type);
+            for x in 0..map_size_x {
+                for y in 0..map_size_y {
+                    let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
+                    let cell_type = map[[x, y]].cell_type;
+                    let tile = tile_def(cell_type);
                     let image = &tileset[tile.glyph];
                     let pos_px = offset_px + tile_size_px.times(pos);
                     window.draw(
@@ -257,7 +255,7 @@ impl State for Game {
             }
             for entity in entities.iter() {
                 let image = &tileset[entity.tile.glyph];
-                let pos = Vector::new(entity.pos.x, entity.pos.y);
+                let pos = Vector::new(entity.pos.x, ((map_size_y - 1) as i32 - entity.pos.y));
                 let pos_px = offset_px + pos.times(tile_size_px);
                 window.draw(
                     &Rectangle::new(pos_px, image.area().size()),

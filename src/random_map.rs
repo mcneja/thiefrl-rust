@@ -2,6 +2,7 @@ use crate::cell_grid::*;
 use rand::prelude::*;
 use std::cmp::min;
 use std::cmp::max;
+use std::mem::swap;
 use multiarray::Array2D;
 
 const OUTER_BORDER: i32 = 3;
@@ -9,10 +10,40 @@ const OUTER_BORDER: i32 = 3;
 const ROOM_SIZE_X: i32 = 5;
 const ROOM_SIZE_Y: i32 = 5;
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum RoomType
+{
+	Exterior,
+	Courtyard,
+	Interior,
+	MasterSuite,
+}
+
+struct Room
+{
+	pub room_type: RoomType,
+	pub group: usize,
+	pub depth: usize,
+	pub pos_min: Point,
+	pub pos_max: Point,
+	pub edges: Vec<usize>,
+}
+
+struct Adjacency
+{
+	pub origin: Point,
+	pub dir: Point,
+	pub length: i32,
+	pub room_left: usize,
+	pub room_right: usize,
+	pub next_matching: usize,
+	pub door: bool,
+}
+
 pub fn generate_map(seed: u64) -> (CellGrid, Point) {
     let mut rng = rand_pcg::Pcg32::seed_from_u64(seed);
 
-    let map = generate_siheyuan(4, &mut rng);
+    let (map, pos_start) = generate_siheyuan(4, &mut rng);
 
     /*
     let map_size = vector2d::Vector2D::new(32, 32);
@@ -40,13 +71,10 @@ pub fn generate_map(seed: u64) -> (CellGrid, Point) {
     map[[map_size.x-1, map_size.y-1]].cell_type = CellType::Wall1001;
     */
 
-    let player_x = (map.extents()[0] / 2) as i32;
-    let player_y = (map.extents()[1] - 1) as i32;
-
-    (map, Point::new(player_x, player_y))
+    (map, pos_start)
 }
 
-fn generate_siheyuan(level: i32, rng: &mut impl Rng) -> CellGrid {
+fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> (CellGrid, Point) {
 	let mut size_x: i32 = 0;
     for _ in 0..min(3, level) {
         size_x += rng.gen_range(0, 2);
@@ -81,26 +109,21 @@ fn generate_siheyuan(level: i32, rng: &mut impl Rng) -> CellGrid {
 
 	fixup_walls(&mut map);
 
-    map
-
-    /*
 	// Create exits connecting rooms.
 
-	std::vector<Room> rooms;
-	std::vector<Adjacency> adjacencies;
-
-	createExits(
+	let (rooms, adjacencies, pos_start) = create_exits(
+        &mut rng,
 		level,
 		mirror_x,
 		mirror_y,
-		inside,
-		offset_x,
-		offset_y,
-		rooms,
-		adjacencies,
-		map,
-		g_player.m_pos);
+		&inside,
+		&offset_x,
+		&offset_y,
+		&mut map);
 
+    (map, pos_start)
+
+    /*
 	// Place loot.
 
 	placeLoot(rooms, adjacencies, map);
@@ -453,4 +476,606 @@ fn neighboring_walls(map: &CellGrid, x: usize, y: usize) -> u32 {
     }
 
 	wall_bits
+}
+
+fn create_exits(
+    mut rng: &mut impl Rng,
+	level: i32,
+	mirror_x: bool,
+	mirror_y: bool,
+	inside: &Array2D<bool>,
+	offset_x: &Array2D<i32>,
+	offset_y: &Array2D<i32>,
+	map: &mut CellGrid
+) -> (Vec<Room>, Vec<Adjacency>, Point) {
+	// Make a set of rooms.
+
+	let rooms_x: usize = inside.extents()[0];
+	let rooms_y: usize = inside.extents()[1];
+
+	let mut room_index: Array2D<usize> = Array2D::new([rooms_x, rooms_y], 0);
+    let mut rooms: Vec<Room> = Vec::new();
+
+	// This room represents the area surrounding the map.
+
+    rooms.push(
+        Room {
+            room_type: RoomType::Exterior,
+            group: 0,
+            depth: 0,
+            pos_min: Point::new(0, 0), // not meaningful for this room
+            pos_max: Point::new(0, 0), // not meaningful for this room
+            edges: Vec::new(),
+        }
+    );
+
+	for rx in 0..rooms_x {
+		for ry in 0..rooms_y {
+			let group_index = rooms.len();
+
+			room_index[[rx, ry]] = group_index;
+
+            rooms.push(
+                Room {
+                    room_type: if inside[[rx, ry]] {RoomType::Interior} else {RoomType::Courtyard},
+                    group: group_index,
+                    depth: 0,
+                    pos_min: Point::new(offset_x[[rx, ry]] + 1, offset_y[[rx, ry]] + 1),
+                    pos_max: Point::new(offset_x[[rx + 1, ry]], offset_y[[rx, ry + 1]]),
+                    edges: Vec::new(),
+                }
+            );
+		}
+	}
+
+	// Compute a list of room adjacencies.
+
+	let mut adjacencies = compute_adjacencies(mirror_x, mirror_y, &inside, &offset_x, &offset_y, &room_index);
+    adjacencies.shuffle(&mut rng);
+	store_adjacencies_in_rooms(&adjacencies, &mut rooms);
+
+	// Connect rooms together.
+
+	let pos_start = connect_rooms(&mut rng, &mut rooms, &mut adjacencies);
+
+    /*
+
+	// Assign types to the rooms.
+
+	assignRoomTypes(room_index, adjacencies, rooms);
+
+	// Generate pathing information.
+
+	generatePatrolRoutes(rooms, adjacencies, map);
+
+	// Render doors and windows.
+
+	renderWalls(rooms, adjacencies, map);
+
+	// Render floors.
+
+	renderRooms(level, rooms, map);
+    */
+
+    (rooms, adjacencies, pos_start)
+}
+
+fn compute_adjacencies
+(
+	mirror_x: bool,
+	mirror_y: bool,
+	inside: &Array2D<bool>,
+	offset_x: &Array2D<i32>,
+	offset_y: &Array2D<i32>,
+	room_index: &Array2D<usize>
+) -> Vec<Adjacency> {
+
+	let rooms_x = inside.extents()[0];
+	let rooms_y = inside.extents()[1];
+
+    let mut adjacencies: Vec<Adjacency> = Vec::new();
+
+    {
+        let mut adjacency_rows: Vec<Vec<usize>> = Vec::with_capacity(rooms_y + 1);
+
+        {
+            let mut adjacency_row: Vec<usize> = Vec::with_capacity(rooms_x);
+
+            let ry = 0;
+
+            for rx in 0..rooms_x {
+                let x0 = offset_x[[rx, ry]];
+                let x1 = offset_x[[rx+1, ry]];
+                let y = offset_y[[rx, ry]];
+
+                let i = adjacencies.len();
+                adjacency_row.push(i);
+
+                adjacencies.push(
+                    Adjacency {
+                        origin: Point::new(x0 + 1, y),
+                        dir: Point::new(1, 0),
+                        length: x1 - (x0 + 1),
+                        room_left: room_index[[rx, ry]],
+                        room_right: 0,
+                        next_matching: i,
+                        door: false,
+                    }
+                );
+            }
+
+            adjacency_rows.push(adjacency_row);
+        }
+
+        for ry in 1..rooms_y {
+            let mut adjacency_row: Vec<usize> = Vec::with_capacity(3 * rooms_x);
+
+            for rx in 0..rooms_x {
+                let x0_upper = offset_x[[rx, ry]];
+                let x0_lower = offset_x[[rx, ry-1]];
+                let x1_upper = offset_x[[rx+1, ry]];
+                let x1_lower = offset_x[[rx+1, ry-1]];
+                let x0 = max(x0_lower, x0_upper);
+                let x1 = min(x1_lower, x1_upper);
+                let y = offset_y[[rx, ry]];
+
+                if rx > 0 && x0_lower - x0_upper > 1 {
+                    let i = adjacencies.len();
+                    adjacency_row.push(i);
+
+                    adjacencies.push(
+                        Adjacency {
+                            origin: Point::new(x0_upper + 1, y),
+                            dir: Point::new(1, 0),
+                            length: x0_lower - (x0_upper + 1),
+                            room_left: room_index[[rx, ry]],
+                            room_right: room_index[[rx - 1, ry - 1]],
+                            next_matching: i,
+                            door: false,
+                        }
+                    );
+                }
+
+                if x1 - x0 > 1 {
+                    let i = adjacencies.len();
+                    adjacency_row.push(i);
+
+                    adjacencies.push(
+                        Adjacency {
+                            origin: Point::new(x0 + 1, y),
+                            dir: Point::new(1, 0),
+                            length: x1 - (x0 + 1),
+                            room_left: room_index[[rx, ry]],
+                            room_right: room_index[[rx, ry - 1]],
+                            next_matching: i,
+                            door: false,
+                        }
+                    );
+                }
+
+                if rx + 1 < rooms_x && x1_upper - x1_lower > 1 {
+                    let i = adjacencies.len();
+                    adjacency_row.push(i);
+
+                    adjacencies.push(
+                        Adjacency {
+                            origin: Point::new(x1_lower + 1, y),
+                            dir: Point::new(1, 0),
+                            length: x1_upper - (x1_lower + 1),
+                            room_left: room_index[[rx, ry]],
+                            room_right: room_index[[rx + 1, ry - 1]],
+                            next_matching: i,
+                            door: false,
+                        }
+                    );
+                }
+            }
+
+            adjacency_rows.push(adjacency_row);
+        }
+
+        {
+            let mut adjacency_row: Vec<usize> = Vec::with_capacity(rooms_x);
+
+            let ry = rooms_y;
+
+            for rx in 0..rooms_x {
+                let x0 = offset_x[[rx, ry-1]];
+                let x1 = offset_x[[rx+1, ry-1]];
+                let y = offset_y[[rx, ry]];
+
+                let i = adjacencies.len();
+                adjacency_row.push(i);
+
+                adjacencies.push(
+                    Adjacency {
+                        origin: Point::new(x0 + 1, y),
+                        dir: Point::new(1, 0),
+                        length: x1 - (x0 + 1),
+                        room_left: 0,
+                        room_right: room_index[[rx, ry - 1]],
+                        next_matching: i,
+                        door: false,
+                    }
+                );
+            }
+
+            adjacency_rows.push(adjacency_row);
+        }
+
+        if mirror_x {
+            for ry in 0..adjacency_rows.len() {
+                let row = &adjacency_rows[ry];
+
+                let mut i = 0;
+                let mut j = row.len() - 1;
+                while i < j {
+                    let adj0 = row[i];
+                    let adj1 = row[j];
+
+                    adjacencies[adj0].next_matching = adj1;
+                    adjacencies[adj1].next_matching = adj0;
+
+                    // Flip edge a1 to point the opposite direction
+                    {
+                        let a1 = &mut adjacencies[adj1];
+                        a1.origin += a1.dir * (a1.length - 1);
+                        a1.dir = -a1.dir;
+                        swap(&mut a1.room_left, &mut a1.room_right);
+                    }
+
+                    i += 1;
+                    j -= 1;
+                }
+            }
+        }
+
+        if mirror_y {
+            let mut ry0 = 0;
+            let mut ry1 = adjacency_rows.len() - 1;
+            while ry0 < ry1 {
+                let row0 = &adjacency_rows[ry0];
+                let row1 = &adjacency_rows[ry1];
+
+                assert!(row0.len() == row1.len());
+
+                for i in 0..row0.len() {
+                    let adj0 = row0[i];
+                    let adj1 = row1[i];
+                    adjacencies[adj0].next_matching = adj1;
+                    adjacencies[adj1].next_matching = adj0;
+                }
+
+                ry0 += 1;
+                ry1 -= 1;
+            }
+        }
+    }
+
+    {
+        let mut adjacency_rows: Vec<Vec<usize>> = Vec::with_capacity(rooms_x + 1);
+
+        {
+            let mut adjacency_row: Vec<usize> = Vec::with_capacity(rooms_y);
+
+            let rx = 0;
+
+            for ry in 0..rooms_y {
+                let y0 = offset_y[[rx, ry]];
+                let y1 = offset_y[[rx, ry+1]];
+                let x = offset_x[[rx, ry]];
+
+                let i = adjacencies.len();
+                adjacency_row.push(i);
+
+                adjacencies.push(
+                    Adjacency {
+                        origin: Point::new(x, y0 + 1),
+                        dir: Point::new(0, 1),
+                        length: y1 - (y0 + 1),
+                        room_left: 0,
+                        room_right: room_index[[rx, ry]],
+                        next_matching: i,
+                        door: false,
+                    }
+                );
+            }
+
+            adjacency_rows.push(adjacency_row);
+        }
+
+        for rx in 1..rooms_x {
+            let mut adjacency_row: Vec<usize> = Vec::with_capacity(3 * rooms_y);
+
+            for ry in 0..rooms_y {
+                let y0_left  = offset_y[[rx-1, ry]];
+                let y0_right = offset_y[[rx, ry]];
+                let y1_left  = offset_y[[rx-1, ry+1]];
+                let y1_right = offset_y[[rx, ry+1]];
+                let y0 = max(y0_left, y0_right);
+                let y1 = min(y1_left, y1_right);
+                let x = offset_x[[rx, ry]];
+
+                if ry > 0 && y0_left - y0_right > 1 {
+                    let i = adjacencies.len();
+                    adjacency_row.push(i);
+
+                    adjacencies.push(
+                        Adjacency {
+                            origin: Point::new(x, y0_right + 1),
+                            dir: Point::new(0, 1),
+                            length: y0_left - (y0_right + 1),
+                            room_left: room_index[[rx - 1, ry - 1]],
+                            room_right: room_index[[rx, ry]],
+                            next_matching: i,
+                            door: false,
+                        }
+                    );
+                }
+
+                if y1 - y0 > 1 {
+                    let i = adjacencies.len();
+                    adjacency_row.push(i);
+
+                    adjacencies.push(
+                        Adjacency {
+                            origin: Point::new(x, y0 + 1),
+                            dir: Point::new(0, 1),
+                            length: y1 - (y0 + 1),
+                            room_left: room_index[[rx - 1, ry]],
+                            room_right: room_index[[rx, ry]],
+                            next_matching: i,
+                            door: false,
+                        }
+                    );
+                }
+
+                if ry + 1 < rooms_y && y1_right - y1_left > 1 {
+                    let i = adjacencies.len();
+                    adjacency_row.push(i);
+
+                    adjacencies.push(
+                        Adjacency {
+                            origin: Point::new(x, y1_left + 1),
+                            dir: Point::new(0, 1),
+                            length: y1_right - (y1_left + 1),
+                            room_left: room_index[[rx - 1, ry + 1]],
+                            room_right: room_index[[rx, ry]],
+                            next_matching: i,
+                            door: false,
+                        }
+                    );
+                }
+            }
+
+            adjacency_rows.push(adjacency_row);
+        }
+
+        {
+            let mut adjacency_row: Vec<usize> = Vec::with_capacity(rooms_y);
+
+            let rx = rooms_x;
+
+            for ry in 0..rooms_y {
+                let y0 = offset_y[[rx-1, ry]];
+                let y1 = offset_y[[rx-1, ry+1]];
+                let x = offset_x[[rx, ry]];
+
+                let i = adjacencies.len();
+                adjacencies.push(
+                    Adjacency {
+                        origin: Point::new(x, y0 + 1),
+                        dir: Point::new(0, 1),
+                        length: y1 - (y0 + 1),
+                        room_left: room_index[[rx - 1, ry]],
+                        room_right: 0,
+                        next_matching: i,
+                        door: false,
+                    }
+                );
+                adjacency_row.push(i);
+            }
+
+            adjacency_rows.push(adjacency_row);
+        }
+
+        if mirror_y {
+            for ry in 0..adjacency_rows.len() {
+                let row = &adjacency_rows[ry];
+                let n = row.len() / 2;
+
+                for i in 0..n {
+                    let adj0 = row[i];
+                    let adj1 = row[(row.len() - 1) - i];
+
+                    adjacencies[adj0].next_matching = adj1;
+                    adjacencies[adj1].next_matching = adj0;
+
+                    {
+                        // Flip edge a1 to point the opposite direction
+                        let a1 = &mut adjacencies[adj1];
+                        a1.origin += a1.dir * (a1.length - 1);
+                        a1.dir = -a1.dir;
+                        swap(&mut a1.room_left, &mut a1.room_right);
+                    }
+                }
+            }
+        }
+
+        if mirror_x {
+            let mut ry0 = 0;
+            let mut ry1 = adjacency_rows.len() - 1;
+            while ry0 < ry1 {
+                let row0 = &adjacency_rows[ry0];
+                let row1 = &adjacency_rows[ry1];
+
+                assert!(row0.len() == row1.len());
+
+                for i in 0..row0.len() {
+                    let adj0 = row0[i];
+                    let adj1 = row1[i];
+                    adjacencies[adj0].next_matching = adj1;
+                    adjacencies[adj1].next_matching = adj0;
+                }
+
+                ry0 += 1;
+                ry1 -= 1;
+            }
+        }
+    }
+
+    adjacencies
+}
+
+fn store_adjacencies_in_rooms(adjacencies: &Vec<Adjacency>, rooms: &mut Vec<Room>) {
+    for (i, adj) in adjacencies.iter().enumerate() {
+		let i0 = adj.room_left;
+		let i1 = adj.room_right;
+		rooms[i0].edges.push(i);
+		rooms[i1].edges.push(i);
+	}
+}
+
+fn connect_rooms(mut rng: &mut impl Rng, mut rooms: &mut Vec<Room>, adjacencies: &mut Vec<Adjacency>) -> Point {
+
+	// Connect all adjacent courtyard rooms together.
+
+    for adj in adjacencies.iter_mut() {
+		let i0 = adj.room_left;
+		let i1 = adj.room_right;
+		if rooms[i0].room_type != RoomType::Courtyard || rooms[i1].room_type != RoomType::Courtyard {
+            continue;
+        }
+
+        adj.door = true;
+        let group0 = rooms[i0].group;
+        let group1 = rooms[i1].group;
+        join_groups(&mut rooms, group0, group1);
+	}
+
+    // Make a list of edges with the symmetric matching ones paired up so they can be processed at the same time.
+
+    let mut adjacency_order: Vec<usize> = (0..adjacencies.len()).collect();
+    adjacency_order.shuffle(&mut rng);
+
+    /*
+
+	// Connect all the interior rooms with doors.
+
+    for (i, adj) in adjacencies.iter_mut().enumerate() {
+		let i0 = adj.room_left;
+		let i1 = adj.room_right;
+		if rooms[i0].room_type != RoomType::Interior || rooms[i1].room_type != RoomType::Interior {
+			continue;
+        }
+
+		let group0 = rooms[i0].group;
+		let group1 = rooms[i1].group;
+
+        let j = adj.next_matching;
+
+        adj.door =
+            if j < i {
+                adjacencies[j].door
+            } else {
+                group0 != group1 || rng.gen_range(0, 3) == 0
+            };
+
+        if adj.door {
+    		join_groups(&mut rooms, group0, group1);
+        }
+	}
+
+	// Create doors between the interiors and the courtyard areas.
+
+    for (i, adj) in adjacencies.iter_mut().enumerate() {
+		let i0 = adj.room_left;
+		let i1 = adj.room_right;
+
+		let roomType0 = rooms[i0].room_type;
+		let roomType1 = rooms[i1].room_type;
+
+		if roomType0 == roomType1 {
+			continue;
+        }
+
+		if roomType0 == RoomType::Exterior || roomType1 == RoomType::Exterior {
+			continue;
+        }
+
+		let group0 = rooms[i0].group;
+		let group1 = rooms[i1].group;
+
+        let j = adj.next_matching;
+
+        adj.door =
+            if j < i {
+                adjacencies[j].door
+            } else {
+                group0 != group1 || rng.gen_range(0, 3) == 0
+            };
+
+        if adj.door {
+    		join_groups(&mut rooms, group0, group1);
+        }
+	}
+
+    */
+
+	// Create the door to the surrounding exterior. It must be on the south side.
+
+    let mut pos_start = Point::new(0, 0);
+
+    /*
+
+    for (i, adj) in adjacencies.iter_mut().enumerate() {
+
+		if adj.dir.x == 0 {
+			continue;
+        }
+
+		if adj.next_matching > i {
+			continue;
+        }
+
+		if adj.next_matching == i {
+			if rooms[adj.room_right].room_type != RoomType::Exterior {
+				continue;
+            }
+		} else {
+			if rooms[adj.room_left].room_type != RoomType::Exterior {
+				continue;
+            }
+		}
+
+		// Set the player's start position based on where the door is.
+
+		pos_start.x = adj.origin.x + adj.dir.x * (adj.length / 2);
+		pos_start.y = OUTER_BORDER - 1;
+
+		adj.door = true;
+
+		// Break symmetry if the door is off center.
+
+		if adj.next_matching != i {
+			adjacencies[adj.next_matching].next_matching = adj.next_matching;
+			adj.next_matching = i;
+		}
+
+		break;
+	}
+
+    */
+
+    pos_start
+}
+
+fn join_groups(rooms: &mut Vec<Room>, group_from: usize, group_to: usize) {
+	if group_from != group_to {
+        for room in rooms.iter_mut() {
+            if room.group == group_from {
+                room.group = group_to;
+            }
+        }
+    }
 }
