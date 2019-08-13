@@ -52,3 +52,59 @@ pub struct Cell {
 
 pub type CellGrid = multiarray::Array2D<Cell>;
 pub type Point = vector2d::Vector2D<i32>;
+
+pub struct Map {
+    pub cells: CellGrid,
+    pub items: Vec<Item>,
+    pub guards: Vec<Guard>,
+    pub pos_start: Point,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum GuardMode
+{
+    Patrol,
+    Look,
+    Listen,
+    ChaseVisibleTarget,
+    MoveToLastSighting,
+    MoveToLastSound,
+    MoveToGuardShout,
+}
+
+pub struct Guard {
+	pub pos: Point,
+	pub dir: Point,
+	pub mode: GuardMode,
+	pub speaking: bool,
+	pub has_moved: bool,
+	pub heard_thief: bool,
+	pub hearing_guard: bool,
+	pub heard_guard: bool,
+	pub heard_guard_pos: Point,
+
+	// Chase
+	pub goal: Point,
+	pub mode_timeout: usize,
+
+	// Patrol
+	pub region_goal: usize,
+    pub region_prev: usize,
+}
+
+pub struct Item {
+    pub pos: Point,
+    pub kind: ItemKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum ItemKind {
+    Chair,
+    Table,
+    Bush,
+    Coin,
+    DoorNS,
+    DoorEW,
+    PortcullisNS,
+    PortcullisEW,
+}

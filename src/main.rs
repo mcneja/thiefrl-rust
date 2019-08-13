@@ -89,6 +89,7 @@ struct Entity {
 
 struct Game {
     map: CellGrid,
+    items: Vec<Item>,
     entities: Vec<Entity>,
     player_id: usize,
     tileset: Asset<Vec<Image>>,
@@ -159,10 +160,36 @@ fn blocked(map: &CellGrid, pos_old: &Point, pos_new: &Point) -> bool {
         return true;
     }
 
-//	if (Guard::at(map, pos_new) || ShipCaptain::at(map, pos_new) || Leader::at(map, pos_new))
+//	if (Guard::at(map, pos_new))
 //		return true;
 
 	false
+}
+
+fn glyph_for_item(kind: ItemKind) -> usize {
+    match kind {
+        ItemKind::Chair => 148,
+        ItemKind::Table => 146,
+        ItemKind::Bush => 144,
+        ItemKind::Coin => 158,
+        ItemKind::DoorNS => 169,
+        ItemKind::DoorEW => 167,
+        ItemKind::PortcullisNS => 194,
+        ItemKind::PortcullisEW => 194,
+    }
+}
+
+fn color_for_item(kind: ItemKind) -> Color {
+    match kind {
+        ItemKind::Chair => color_preset::DARK_BROWN,
+        ItemKind::Table => color_preset::DARK_BROWN,
+        ItemKind::Bush => color_preset::DARK_GREEN,
+        ItemKind::Coin => color_preset::LIGHT_YELLOW,
+        ItemKind::DoorNS => color_preset::DARK_BROWN,
+        ItemKind::DoorEW => color_preset::DARK_BROWN,
+        ItemKind::PortcullisNS => color_preset::LIGHT_GRAY,
+        ItemKind::PortcullisEW => color_preset::LIGHT_GRAY,
+    }
 }
 
 impl State for Game {
@@ -172,12 +199,12 @@ impl State for Game {
 
         let random_seed = rand::random::<u64>();
 
-        let (map, pos_player) = random_map::generate_map(random_seed);
-        let mut entities = generate_entities();
+        let initial_state = random_map::generate_map(random_seed);
+        let mut entities = Vec::new();
 
         let player_id = entities.len();
         entities.push(Entity {
-            pos: pos_player,
+            pos: initial_state.pos_start,
             tile: Tile{ glyph: 208, color: color_preset::LIGHT_CYAN, blocks_player: false },
         });
 
@@ -197,7 +224,8 @@ impl State for Game {
         }));
 
         Ok(Self {
-            map,
+            map: initial_state.cells,
+            items: initial_state.items,
             entities,
             player_id,
             tileset,
@@ -238,6 +266,7 @@ impl State for Game {
         let map_size_x = map.extents()[0];
         let map_size_y = map.extents()[1];
         let entities = &self.entities;
+        let items = &self.items;
         self.tileset.execute(|tileset| {
             for x in 0..map_size_x {
                 for y in 0..map_size_y {
@@ -252,6 +281,17 @@ impl State for Game {
                     )
                 }
             }
+            for item in items.iter() {
+                let pos = Vector::new(item.pos.x, (map_size_y - 1) as i32 - item.pos.y);
+                let pos_px = offset_px + pos.times(tile_size_px);
+                let glyph = glyph_for_item(item.kind);
+                let color = color_for_item(item.kind);
+                let image = &tileset[glyph];
+                window.draw(
+                    &Rectangle::new(pos_px, image.area().size()),
+                    Blended(&image, color),
+                );
+            }
             for entity in entities.iter() {
                 let image = &tileset[entity.tile.glyph];
                 let pos = Vector::new(entity.pos.x, (map_size_y - 1) as i32 - entity.pos.y);
@@ -265,28 +305,5 @@ impl State for Game {
         })?;
 
         Ok(())
-    }
-}
-
-fn generate_entities() -> Vec<Entity> {
-    vec![
-        guard(9, 6),
-        guard(2, 4),
-        coin(7, 5),
-        coin(4, 8),
-    ]
-}
-
-fn guard(x: i32, y: i32) -> Entity {
-    Entity {
-        pos: Point::new(x, y),
-        tile: Tile { glyph: 212, color: color_preset::LIGHT_MAGENTA, blocks_player: true },
-    }
-}
-
-fn coin(x: i32, y: i32) -> Entity {
-    Entity {
-        pos: Point::new(x, y),
-        tile: Tile { glyph: 158, color: color_preset::LIGHT_YELLOW, blocks_player: false },
     }
 }

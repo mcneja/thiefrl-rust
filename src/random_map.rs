@@ -40,41 +40,13 @@ struct Adjacency
 	pub door: bool,
 }
 
-pub fn generate_map(seed: u64) -> (CellGrid, Point) {
+pub fn generate_map(seed: u64) -> Map {
     let mut rng = rand_pcg::Pcg32::seed_from_u64(seed);
-
-    let (map, pos_start) = generate_siheyuan(4, &mut rng);
-
-    /*
-    let map_size = vector2d::Vector2D::new(32, 32);
-    let default_cell = Cell {
-        cell_type: CellType::GroundNormal,
-        visible: false,
-        lit: false,
-        seen: false,
-        visited: false,
-        region: 0,
-        visit_stamp: 0,
-    };
-    let mut map = CellGrid::new([map_size.x, map_size.y], default_cell);
-    for x in 1..map_size.x-1 {
-        map[[x, 0]].cell_type = CellType::Wall0011;
-        map[[x, map_size.y-1]].cell_type = CellType::Wall0011;
-    }
-    for y in 1..map_size.y-1 {
-        map[[0, y]].cell_type = CellType::Wall1100;
-        map[[map_size.x-1, y]].cell_type = CellType::Wall1100;
-    }
-    map[[0, 0]].cell_type = CellType::Wall0110;
-    map[[map_size.x-1, 0]].cell_type = CellType::Wall0101;
-    map[[0, map_size.y-1]].cell_type = CellType::Wall1010;
-    map[[map_size.x-1, map_size.y-1]].cell_type = CellType::Wall1001;
-    */
-
-    (map, pos_start)
+    let level = 4;
+    generate_siheyuan(level, &mut rng)
 }
 
-fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> (CellGrid, Point) {
+fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> Map {
 	let mut size_x: i32 = 0;
     for _ in 0..min(3, level) {
         size_x += rng.gen_range(0, 2);
@@ -103,13 +75,20 @@ fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> (CellGrid, Point) {
 
 	// Convert the room descriptions to walls.
 
-    let mut map = plot_walls(&inside, &offset_x, &offset_y);
+    let mut cells = plot_walls(&inside, &offset_x, &offset_y);
 
 	// Fix up walls.
 
-	fixup_walls(&mut map);
+	fixup_walls(&mut cells);
 
 	// Create exits connecting rooms.
+
+    let mut map = Map {
+        cells: cells,
+        items: Vec::new(),
+        guards: Vec::new(),
+        pos_start: Point::new(0, 0),
+    };
 
 	let (rooms, adjacencies, pos_start) = create_exits(
         &mut rng,
@@ -121,7 +100,9 @@ fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> (CellGrid, Point) {
 		&offset_y,
 		&mut map);
 
-    (map, pos_start)
+    map.pos_start = pos_start;
+
+    map
 
     /*
 	// Place loot.
@@ -486,7 +467,7 @@ fn create_exits(
 	inside: &Array2D<bool>,
 	offset_x: &Array2D<i32>,
 	offset_y: &Array2D<i32>,
-	mut map: &mut CellGrid
+	mut map: &mut Map
 ) -> (Vec<Room>, Vec<Adjacency>, Point) {
 	// Make a set of rooms.
 
@@ -1070,7 +1051,10 @@ fn connect_rooms(mut rng: &mut impl Rng, mut rooms: &mut Vec<Room>, adjacencies:
 
     let mut pos_start = Point::new(0, 0);
 
-    /*
+    for edge_set in &edge_sets {
+        // Do it here so it's randomized
+    }
+
     for (i, adj) in adjacencies.iter_mut().enumerate() {
 
 		if adj.dir.x == 0 {
@@ -1100,14 +1084,15 @@ fn connect_rooms(mut rng: &mut impl Rng, mut rooms: &mut Vec<Room>, adjacencies:
 
 		// Break symmetry if the door is off center.
 
+/*
 		if adj.next_matching != i {
 			adjacencies[adj.next_matching].next_matching = adj.next_matching;
 			adj.next_matching = i;
 		}
+*/
 
 		break;
 	}
-    */
 
     pos_start
 }
@@ -1208,7 +1193,7 @@ const ONE_WAY_WINDOW: [CellType; 5] = [
 	CellType::OneWayWindowN,
 ];
 
-fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, map: &mut CellGrid) {
+fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, mut map: &mut Map) {
 
 	// Render grass connecting courtyard rooms.
 
@@ -1222,7 +1207,7 @@ fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacen
 
         for j in 0..adj.length {
 			let p: Point = adj.origin + adj.dir * j;
-			map[[p.x as usize, p.y as usize]].cell_type = CellType::GroundGrass;
+			map.cells[[p.x as usize, p.y as usize]].cell_type = CellType::GroundGrass;
 		}
     }
 
@@ -1275,7 +1260,7 @@ fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacen
                                 a.dir
                             };
 
-						map[[p.x as usize, p.y as usize]].cell_type = ONE_WAY_WINDOW[(2 * dir.x + dir.y + 2) as usize];
+						map.cells[[p.x as usize, p.y as usize]].cell_type = ONE_WAY_WINDOW[(2 * dir.x + dir.y + 2) as usize];
 					}
 				}
 			} else if type0 == RoomType::Courtyard || type1 == RoomType::Courtyard {
@@ -1296,8 +1281,8 @@ fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacen
 						let p: Point = a.origin + a.dir * k;
 						let q: Point = a.origin + a.dir * (a.length - (k + 1));
 
-						map[[p.x as usize, p.y as usize]].cell_type = window_type;
-						map[[q.x as usize, q.y as usize]].cell_type = window_type;
+						map.cells[[p.x as usize, p.y as usize]].cell_type = window_type;
+						map.cells[[q.x as usize, q.y as usize]].cell_type = window_type;
 					}
                     k += 2;
 				}
@@ -1315,23 +1300,23 @@ fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacen
 
 			let orient_ns = a.dir.x == 0;
 
-			map[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::DoorNS} else {CellType::DoorEW};
+			map.cells[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::DoorNS} else {CellType::DoorEW};
 
 			let room_type_left = rooms[a.room_left].room_type;
 			let room_type_right = rooms[a.room_right].room_type;
 
 			if room_type_left == RoomType::Exterior || room_type_right == RoomType::Exterior {
-                map[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::PortcullisNS} else {CellType::PortcullisEW};
-//				place_portcullis(map, p, orient_ns);
+                map.cells[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::PortcullisNS} else {CellType::PortcullisEW};
+                place_item(&mut map, p.x, p.y, if orient_ns {ItemKind::PortcullisNS} else {ItemKind::PortcullisEW});
             } else if room_type_left != RoomType::MasterSuite || room_type_right != RoomType::MasterSuite || install_master_suite_door {
-                map[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::DoorNS} else {CellType::DoorEW};
-//				place_door(map, p, orient_ns);
+                map.cells[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::DoorNS} else {CellType::DoorEW};
+				place_item(&mut map, p.x, p.y, if orient_ns {ItemKind::DoorNS} else {ItemKind::DoorEW});
             }
 		}
 	}
 }
 
-fn render_rooms(level: i32, rooms: &Vec<Room>, map: &mut CellGrid, rng: &mut impl Rng) {
+fn render_rooms(level: i32, rooms: &Vec<Room>, mut map: &mut Map, rng: &mut impl Rng) {
     for i_room in 1..rooms.len() {
 		let room = &rooms[i_room];
 
@@ -1353,7 +1338,7 @@ fn render_rooms(level: i32, rooms: &Vec<Room>, map: &mut CellGrid, rng: &mut imp
                         cell_type
                     };
 
-				map[[x as usize, y as usize]].cell_type = t;
+				map.cells[[x as usize, y as usize]].cell_type = t;
 			}
 		}
 
@@ -1364,72 +1349,72 @@ fn render_rooms(level: i32, rooms: &Vec<Room>, map: &mut CellGrid, rng: &mut imp
 			if dx >= 5 && dy >= 5 {
 				for x in room.pos_min.x + 1 .. room.pos_max.x - 1 {
 					for y in room.pos_min.y + 1 .. room.pos_max.y - 1 {
-						map[[x as usize, y as usize]].cell_type = CellType::GroundWater;
+						map.cells[[x as usize, y as usize]].cell_type = CellType::GroundWater;
 					}
 				}
 			} else if dx >= 2 && dy >= 2 {
-				try_place_bush(map, room.pos_min.x, room.pos_min.y);
-				try_place_bush(map, room.pos_max.x - 1, room.pos_min.y);
-				try_place_bush(map, room.pos_min.x, room.pos_max.y - 1);
-				try_place_bush(map, room.pos_max.x - 1, room.pos_max.y - 1);
+				try_place_bush(&mut map, room.pos_min.x, room.pos_min.y);
+				try_place_bush(&mut map, room.pos_max.x - 1, room.pos_min.y);
+				try_place_bush(&mut map, room.pos_min.x, room.pos_max.y - 1);
+				try_place_bush(&mut map, room.pos_max.x - 1, room.pos_max.y - 1);
 			}
 		} else if room.room_type == RoomType::Interior || room.room_type == RoomType::MasterSuite {
 			if dx >= 5 && dy >= 5 {
 				if room.room_type == RoomType::MasterSuite {
 					for x in 2..dx-2 {
 						for y in 2..dy-2 {
-							map[[(room.pos_min.x + x) as usize, (room.pos_min.y + y) as usize]].cell_type = CellType::GroundWater;
+							map.cells[[(room.pos_min.x + x) as usize, (room.pos_min.y + y) as usize]].cell_type = CellType::GroundWater;
 						}
 					}
 				}
 
-				map[[(room.pos_min.x + 1) as usize, (room.pos_min.y + 1) as usize]].cell_type = CellType::Wall0000;
-				map[[(room.pos_max.x - 2) as usize, (room.pos_min.y + 1) as usize]].cell_type = CellType::Wall0000;
-				map[[(room.pos_min.x + 1) as usize, (room.pos_max.y - 2) as usize]].cell_type = CellType::Wall0000;
-				map[[(room.pos_max.x - 2) as usize, (room.pos_max.y - 2) as usize]].cell_type = CellType::Wall0000;
+				map.cells[[(room.pos_min.x + 1) as usize, (room.pos_min.y + 1) as usize]].cell_type = CellType::Wall0000;
+				map.cells[[(room.pos_max.x - 2) as usize, (room.pos_min.y + 1) as usize]].cell_type = CellType::Wall0000;
+				map.cells[[(room.pos_min.x + 1) as usize, (room.pos_max.y - 2) as usize]].cell_type = CellType::Wall0000;
+				map.cells[[(room.pos_max.x - 2) as usize, (room.pos_max.y - 2) as usize]].cell_type = CellType::Wall0000;
 			} else if dx == 5 && dy >= 3 && (room.room_type == RoomType::Interior || rng.gen_range(0, 3) == 0) {
 				for y in 1..dy-1 {
-					place_chair(map, room.pos_min.x + 1, room.pos_min.y + y);
-					place_table(map, room.pos_min.x + 2, room.pos_min.y + y);
-					place_chair(map, room.pos_min.x + 3, room.pos_min.y + y);
+					place_item(&mut map, room.pos_min.x + 1, room.pos_min.y + y, ItemKind::Chair);
+					place_item(&mut map, room.pos_min.x + 2, room.pos_min.y + y, ItemKind::Table);
+					place_item(&mut map, room.pos_min.x + 3, room.pos_min.y + y, ItemKind::Chair);
 				}
 			} else if dy == 5 && dx >= 3 && (room.room_type == RoomType::Interior || rng.gen_range(0, 3) == 0) {
 				for x in 1..dx-1 {
-					place_chair(map, room.pos_min.x + x, room.pos_min.y + 1);
-					place_table(map, room.pos_min.x + x, room.pos_min.y + 2);
-					place_chair(map, room.pos_min.x + x, room.pos_min.y + 3);
+					place_item(&mut map, room.pos_min.x + x, room.pos_min.y + 1, ItemKind::Chair);
+					place_item(&mut map, room.pos_min.x + x, room.pos_min.y + 2, ItemKind::Table);
+					place_item(&mut map, room.pos_min.x + x, room.pos_min.y + 3, ItemKind::Chair);
 				}
 			} else if dx > dy && (dy & 1) == 1 && rng.gen_range(0, 3) != 0 {
 				let y = room.pos_min.y + dy / 2;
 
 				if room.room_type == RoomType::Interior {
-					try_place_table(map, room.pos_min.x + 1, y);
-					try_place_table(map, room.pos_max.x - 2, y);
+					try_place_table(&mut map, room.pos_min.x + 1, y);
+					try_place_table(&mut map, room.pos_max.x - 2, y);
 				} else {
-					try_place_chair(map, room.pos_min.x + 1, y);
-					try_place_chair(map, room.pos_max.x - 2, y);
+					try_place_chair(&mut map, room.pos_min.x + 1, y);
+					try_place_chair(&mut map, room.pos_max.x - 2, y);
 				}
 			} else if dy > dx && (dx & 1) == 1 && rng.gen_range(0, 3) != 0 {
 				let x = room.pos_min.x + dx / 2;
 
 				if room.room_type == RoomType::Interior {
-					try_place_table(map, x, room.pos_min.y + 1);
-					try_place_table(map, x, room.pos_max.y - 2);
+					try_place_table(&mut map, x, room.pos_min.y + 1);
+					try_place_table(&mut map, x, room.pos_max.y - 2);
 				} else {
-					try_place_chair(map, x, room.pos_min.y + 1);
-					try_place_chair(map, x, room.pos_max.y - 2);
+					try_place_chair(&mut map, x, room.pos_min.y + 1);
+					try_place_chair(&mut map, x, room.pos_max.y - 2);
 				}
 			} else if dx > 3 && dy > 3 {
 				if room.room_type == RoomType::Interior {
-					try_place_table(map, room.pos_min.x, room.pos_min.y);
-					try_place_table(map, room.pos_max.x - 1, room.pos_min.y);
-					try_place_table(map, room.pos_min.x, room.pos_max.y - 1);
-					try_place_table(map, room.pos_max.x - 1, room.pos_max.y - 1);
+					try_place_table(&mut map, room.pos_min.x, room.pos_min.y);
+					try_place_table(&mut map, room.pos_max.x - 1, room.pos_min.y);
+					try_place_table(&mut map, room.pos_min.x, room.pos_max.y - 1);
+					try_place_table(&mut map, room.pos_max.x - 1, room.pos_max.y - 1);
 				} else {
-					try_place_chair(map, room.pos_min.x, room.pos_min.y);
-					try_place_chair(map, room.pos_max.x - 1, room.pos_min.y);
-					try_place_chair(map, room.pos_min.x, room.pos_max.y - 1);
-					try_place_chair(map, room.pos_max.x - 1, room.pos_max.y - 1);
+					try_place_chair(&mut map, room.pos_min.x, room.pos_min.y);
+					try_place_chair(&mut map, room.pos_max.x - 1, room.pos_min.y);
+					try_place_chair(&mut map, room.pos_min.x, room.pos_max.y - 1);
+					try_place_chair(&mut map, room.pos_max.x - 1, room.pos_max.y - 1);
 				}
 			}
 		}
@@ -1456,39 +1441,39 @@ fn door_adjacent(map: &CellGrid, x: i32, y: i32) -> bool {
     false
 }
 
-fn try_place_bush(map: &CellGrid, x: i32, y: i32) {
-	if map[[x as usize, y as usize]].cell_type != CellType::GroundGrass {
+fn try_place_bush(mut map: &mut Map, x: i32, y: i32) {
+	if map.cells[[x as usize, y as usize]].cell_type != CellType::GroundGrass {
 		return;
     }
 
-    if door_adjacent(&map, x, y) {
+    if door_adjacent(&map.cells, x, y) {
         return;
     }
 
-	place_bush(&map, x, y);
+	place_item(&mut map, x, y, ItemKind::Bush);
 }
 
-fn try_place_table(map: &CellGrid, x: i32, y: i32) {
-    if door_adjacent(&map, x, y) {
+fn try_place_table(mut map: &mut Map, x: i32, y: i32) {
+    if door_adjacent(&map.cells, x, y) {
         return;
     }
 
-	place_table(&map, x, y);
+	place_item(&mut map, x, y, ItemKind::Table);
 }
 
-fn try_place_chair(map: &CellGrid, x: i32, y: i32) {
-    if door_adjacent(&map, x, y) {
+fn try_place_chair(mut map: &mut Map, x: i32, y: i32) {
+    if door_adjacent(&map.cells, x, y) {
         return;
     }
 
-	place_chair(&map, x, y);
+	place_item(&mut map, x, y, ItemKind::Chair);
 }
 
-fn place_chair(map: &CellGrid, x: i32, y: i32) {
-}
-
-fn place_table(map: &CellGrid, x: i32, y: i32) {
-}
-
-fn place_bush(map: &CellGrid, x: i32, y: i32) {
+fn place_item(mut map: &mut Map, x: i32, y: i32, item_kind: ItemKind) {
+    map.items.push(
+        Item {
+            pos: Point::new(x, y),
+            kind: item_kind,
+        }
+    );
 }
