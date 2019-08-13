@@ -102,26 +102,26 @@ fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> Map {
 
     map.pos_start = pos_start;
 
-    map
-
-    /*
 	// Place loot.
 
-	placeLoot(rooms, adjacencies, map);
+	place_loot(&mut rng, &rooms, &adjacencies, &mut map);
 
 	// Place exterior junk.
 
-	placeExteriorBushes(map);
-	placeFrontPillars(map);
+	place_exterior_bushes(&mut rng, &mut map);
+	place_front_pillars(&mut map);
 
+    /*
 	// Place guards.
 
 	init_pathing(map);
 
 	placeGuards(level, rooms, map);
-
-	markExteriorAsSeen(map);
     */
+
+	mark_exterior_as_seen(&mut map);
+
+    map
 }
 
 fn make_siheyuan_room_grid(size_x: usize, size_y: usize, rng: &mut impl Rng) -> Array2D<bool> {
@@ -1051,10 +1051,6 @@ fn connect_rooms(mut rng: &mut impl Rng, mut rooms: &mut Vec<Room>, adjacencies:
 
     let mut pos_start = Point::new(0, 0);
 
-    for edge_set in &edge_sets {
-        // Do it here so it's randomized
-    }
-
     for (i, adj) in adjacencies.iter_mut().enumerate() {
 
 		if adj.dir.x == 0 {
@@ -1469,11 +1465,181 @@ fn try_place_chair(mut map: &mut Map, x: i32, y: i32) {
 	place_item(&mut map, x, y, ItemKind::Chair);
 }
 
-fn place_item(mut map: &mut Map, x: i32, y: i32, item_kind: ItemKind) {
+fn place_item(map: &mut Map, x: i32, y: i32, item_kind: ItemKind) {
     map.items.push(
         Item {
             pos: Point::new(x, y),
             kind: item_kind,
         }
     );
+}
+
+fn place_loot(mut rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, mut map: &mut Map) {
+
+	// Count number of internal rooms.
+
+	let mut num_rooms = 0;
+	for room in rooms {
+		if room.room_type == RoomType::Interior || room.room_type == RoomType::MasterSuite {
+			num_rooms += 1;
+        }
+	}
+
+	// Master-suite rooms get loot.
+
+	for room in rooms  {
+		if room.room_type != RoomType::MasterSuite {
+			continue;
+        }
+
+		if rng.gen_range(0, 100) >= 80 {
+			continue;
+        }
+
+		try_place_loot(&mut rng, room.pos_min, room.pos_max, &mut map);
+	}
+
+	// Dead-end rooms automatically get loot.
+
+	for room in rooms.iter() {
+		if room.room_type != RoomType::Interior && room.room_type != RoomType::MasterSuite {
+			continue;
+        }
+
+		let mut num_exits = 0;
+		for i_adj in room.edges.iter() {
+			if adjacencies[*i_adj].door {
+    			num_exits += 1;
+            }
+		}
+
+		if num_exits < 2 {
+			try_place_loot(&mut rng, room.pos_min, room.pos_max, &mut map);
+		}
+	}
+
+	// Place a bit of extra loot.
+
+    let pos_min = Point::new(0, 0);
+    let pos_max = Point::new(map.cells.extents()[0] as i32, map.cells.extents()[1] as i32);
+    for _ in 0..(num_rooms / 4 + rng.gen_range(0, 4)) {
+		try_place_loot(&mut rng, pos_min, pos_max, &mut map);
+	}
+}
+
+fn is_item_at_pos(map: &Map, x: i32, y: i32) -> bool {
+    for item in &map.items {
+        if item.pos.x == x && item.pos.y == y {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn try_place_loot(mut rng: &mut impl Rng, pos_min: Point, pos_max: Point, mut map: &mut Map)
+{
+	let dx = pos_max.x - pos_min.x;
+	let dy = pos_max.y - pos_min.y;
+
+	for _ in 0..1000 {
+        let pos = Point::new(pos_min.x + rng.gen_range(0, dx), pos_min.y + rng.gen_range(0, dy));
+
+		let cell_type = map.cells[[pos.x as usize, pos.y as usize]].cell_type;
+
+		if cell_type != CellType::GroundWood && cell_type != CellType::GroundMarble {
+			continue;
+        }
+
+		if is_item_at_pos(&map, pos.x, pos.y) {
+			continue;
+        }
+
+		place_item(&mut map, pos.x, pos.y, ItemKind::Coin);
+		break;
+	}
+}
+
+fn place_exterior_bushes(rng: &mut impl Rng, mut map: &mut Map) {
+	let sx = map.cells.extents()[0] as i32;
+	let sy = map.cells.extents()[1] as i32;
+
+	for x in 0..sx {
+		for y in sy - OUTER_BORDER + 1 .. sy {
+			if map.cells[[x as usize, y as usize]].cell_type != CellType::GroundNormal {
+				continue;
+            }
+
+            let cell = &mut map.cells[[x as usize, y as usize]];
+			cell.cell_type = CellType::GroundGrass;
+			cell.seen = true;
+		}
+
+		if (x & 1) == 0 && rng.gen_range(0, 5) != 0 {
+			place_item(&mut map, x, sy - 1, ItemKind::Bush);
+		}
+	}
+
+	for y in OUTER_BORDER .. sy - OUTER_BORDER + 1 {
+		for x in 0..OUTER_BORDER-1 {
+			if map.cells[[x as usize, y as usize]].cell_type != CellType::GroundNormal {
+				continue;
+            }
+
+            let cell = &mut map.cells[[x as usize, y as usize]];
+			cell.cell_type = CellType::GroundGrass;
+			cell.seen = true;
+		}
+
+		for x in (sx - OUTER_BORDER + 1) .. sx {
+			if map.cells[[x as usize, y as usize]].cell_type != CellType::GroundNormal {
+				continue;
+            }
+
+            let cell = &mut map.cells[[x as usize, y as usize]];
+			cell.cell_type = CellType::GroundGrass;
+			cell.seen = true;
+		}
+
+		if ((sy - y) & 1) != 0 {
+			if rng.gen_range(0, 5) != 0 {
+				place_item(&mut map, 0, y, ItemKind::Bush);
+            }
+			if rng.gen_range(0, 5) != 0 {
+				place_item(&mut map, sx - 1, y, ItemKind::Bush);
+            }
+		}
+	}
+}
+
+fn place_front_pillars(map: &mut Map) {
+	let sx = (map.cells.extents()[0] as i32) - 1;
+	let cx = (map.cells.extents()[0] as i32) / 2;
+
+    let mut x = OUTER_BORDER;
+    while x < cx {
+		map.cells[[x as usize, 1]].cell_type = CellType::Wall0000;
+		map.cells[[(sx - x) as usize, 1]].cell_type = CellType::Wall0000;
+        x += 5;
+	}
+}
+
+fn mark_exterior_as_seen(map: &mut Map) {
+	let sx = map.cells.extents()[0];
+	let sy = map.cells.extents()[1];
+
+	for x in 0..sx {
+		for y in 0..sy {
+			if map.cells[[x, y]].cell_type == CellType::GroundNormal ||
+				(x > 0 && map.cells[[x-1, y]].cell_type == CellType::GroundNormal) ||
+				(x > 0 && y > 0 && map.cells[[x-1, y-1]].cell_type == CellType::GroundNormal) ||
+				(x > 0 && y+1 < sy && map.cells[[x-1, y+1]].cell_type == CellType::GroundNormal) ||
+				(y > 0 && map.cells[[x, y-1]].cell_type == CellType::GroundNormal) ||
+				(y+1 < sy && map.cells[[x, y+1]].cell_type == CellType::GroundNormal) ||
+				(x+1 < sx && map.cells[[x+1, y]].cell_type == CellType::GroundNormal) ||
+				(x+1 < sx && y > 0 && map.cells[[x+1, y-1]].cell_type == CellType::GroundNormal) ||
+				(x+1 < sx && y+1 < sy && map.cells[[x+1, y+1]].cell_type == CellType::GroundNormal) {
+				map.cells[[x, y]].seen = true;
+			}
+		}
+	}
 }
