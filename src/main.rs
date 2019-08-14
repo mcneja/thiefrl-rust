@@ -89,8 +89,7 @@ struct Entity {
 }
 
 struct Game {
-    map: CellGrid,
-    items: Vec<Item>,
+    map: Map,
     entities: Vec<Entity>,
     player_id: usize,
     tileset: Asset<Vec<Image>>,
@@ -133,12 +132,12 @@ fn on_level(map: &CellGrid, pos: &Point) -> bool {
 	pos.x >= 0 && pos.y >= 0 && pos.x < size_x && pos.y < size_y
 }
 
-fn blocked(map: &CellGrid, pos_old: &Point, pos_new: &Point) -> bool {
-	if !on_level(map, pos_new) {
+fn blocked(map: &Map, pos_old: &Point, pos_new: &Point) -> bool {
+	if !on_level(&map.cells, pos_new) {
 		return true;
     }
 
-    let tile_type = map[[pos_new.x as usize, pos_new.y as usize]].cell_type;
+    let tile_type = map.cells[[pos_new.x as usize, pos_new.y as usize]].cell_type;
     let tile = tile_def(tile_type);
 
 	if tile.blocks_player {
@@ -161,8 +160,9 @@ fn blocked(map: &CellGrid, pos_old: &Point, pos_new: &Point) -> bool {
         return true;
     }
 
-//	if (Guard::at(map, pos_new))
-//		return true;
+    if is_guard_at(map, pos_new.x, pos_new.y) {
+        return true;
+    }
 
 	false
 }
@@ -225,8 +225,7 @@ impl State for Game {
         }));
 
         Ok(Self {
-            map: initial_state.cells,
-            items: initial_state.items,
+            map: initial_state,
             entities,
             player_id,
             tileset,
@@ -264,15 +263,16 @@ impl State for Game {
         let offset_px = Vector::new(0, 0);
 
         let map = &self.map;
-        let map_size_x = map.extents()[0];
-        let map_size_y = map.extents()[1];
+        let map_size_x = map.cells.extents()[0];
+        let map_size_y = map.cells.extents()[1];
         let entities = &self.entities;
-        let items = &self.items;
+        let items = &self.map.items;
+        let guards = &self.map.guards;
         self.tileset.execute(|tileset| {
             for x in 0..map_size_x {
                 for y in 0..map_size_y {
                     let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
-                    let cell = &map[[x, y]];
+                    let cell = &map.cells[[x, y]];
                     let tile = tile_def(cell.cell_type);
                     let image = &tileset[tile.glyph];
                     let pos_px = offset_px + tile_size_px.times(pos);
@@ -283,9 +283,9 @@ impl State for Game {
                     )
                 }
             }
-            for item in items.iter() {
+            for item in items {
                 let pos = Vector::new(item.pos.x, (map_size_y - 1) as i32 - item.pos.y);
-                let cell = &map[[item.pos.x as usize, item.pos.y as usize]];
+                let cell = &map.cells[[item.pos.x as usize, item.pos.y as usize]];
                 let pos_px = offset_px + pos.times(tile_size_px);
                 let glyph = glyph_for_item(item.kind);
                 let color = if cell.lit {color_for_item(item.kind)} else {color_preset::DARK_BLUE};
@@ -295,13 +295,24 @@ impl State for Game {
                     Blended(&image, color),
                 );
             }
-            for entity in entities.iter() {
+            for entity in entities {
                 let image = &tileset[entity.tile.glyph];
                 let pos = Vector::new(entity.pos.x, (map_size_y - 1) as i32 - entity.pos.y);
                 let pos_px = offset_px + pos.times(tile_size_px);
                 window.draw(
                     &Rectangle::new(pos_px, image.area().size()),
                     Blended(&image, entity.tile.color),
+                );
+            }
+            for guard in guards {
+                let glyph = 212;
+                let image = &tileset[glyph];
+                let pos = Vector::new(guard.pos.x, (map_size_y - 1) as i32 - guard.pos.y);
+                let pos_px = offset_px + pos.times(tile_size_px);
+                let color = color_preset::LIGHT_MAGENTA;
+                window.draw(
+                    &Rectangle::new(pos_px, image.area().size()),
+                    Blended(&image, color)
                 );
             }
             Ok(())

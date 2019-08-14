@@ -40,13 +40,15 @@ struct Adjacency
 	pub door: bool,
 }
 
+type MyRng = rand_pcg::Pcg32;
+
 pub fn generate_map(seed: u64) -> Map {
-    let mut rng = rand_pcg::Pcg32::seed_from_u64(seed);
+    let mut rng = MyRng::seed_from_u64(seed);
     let level = 4;
     generate_siheyuan(level, &mut rng)
 }
 
-fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> Map {
+fn generate_siheyuan(level: i32, rng: &mut MyRng) -> Map {
 	let mut size_x: i32 = 0;
     for _ in 0..min(3, level) {
         size_x += rng.gen_range(0, 2);
@@ -91,7 +93,7 @@ fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> Map {
     };
 
 	let (rooms, adjacencies, pos_start) = create_exits(
-        &mut rng,
+        rng,
 		level,
 		mirror_x,
 		mirror_y,
@@ -104,27 +106,25 @@ fn generate_siheyuan(level: i32, mut rng: &mut impl Rng) -> Map {
 
 	// Place loot.
 
-	place_loot(&mut rng, &rooms, &adjacencies, &mut map);
+	place_loot(rng, &rooms, &adjacencies, &mut map);
 
 	// Place exterior junk.
 
-	place_exterior_bushes(&mut rng, &mut map);
+	place_exterior_bushes(rng, &mut map);
 	place_front_pillars(&mut map);
 
-    /*
 	// Place guards.
 
-	init_pathing(map);
+//	init_pathing(map);
 
-	placeGuards(level, rooms, map);
-    */
+	place_guards(rng, level, &rooms, &mut map);
 
 	mark_exterior_as_seen(&mut map);
 
     map
 }
 
-fn make_siheyuan_room_grid(size_x: usize, size_y: usize, rng: &mut impl Rng) -> Array2D<bool> {
+fn make_siheyuan_room_grid(size_x: usize, size_y: usize, rng: &mut MyRng) -> Array2D<bool> {
     let mut inside = Array2D::new([size_x, size_y], true);
 
 	let half_x = (size_x + 1) / 2;
@@ -144,7 +144,7 @@ fn make_siheyuan_room_grid(size_x: usize, size_y: usize, rng: &mut impl Rng) -> 
     inside
 }
 
-fn offset_walls(mirror_x: bool, mirror_y: bool, inside: &Array2D<bool>, rng: &mut impl Rng) -> (Array2D<i32>, Array2D<i32>) {
+fn offset_walls(mirror_x: bool, mirror_y: bool, inside: &Array2D<bool>, rng: &mut MyRng) -> (Array2D<i32>, Array2D<i32>) {
 	let rooms_x = inside.extents()[0];
 	let rooms_y = inside.extents()[1];
 
@@ -460,14 +460,14 @@ fn neighboring_walls(map: &CellGrid, x: usize, y: usize) -> u32 {
 }
 
 fn create_exits(
-    mut rng: &mut impl Rng,
+    rng: &mut MyRng,
 	level: i32,
 	mirror_x: bool,
 	mirror_y: bool,
 	inside: &Array2D<bool>,
 	offset_x: &Array2D<i32>,
 	offset_y: &Array2D<i32>,
-	mut map: &mut Map
+	map: &mut Map
 ) -> (Vec<Room>, Vec<Adjacency>, Point) {
 	// Make a set of rooms.
 
@@ -516,7 +516,7 @@ fn create_exits(
 
 	// Connect rooms together.
 
-	let pos_start = connect_rooms(&mut rng, &mut rooms, &mut adjacencies);
+	let pos_start = connect_rooms(rng, &mut rooms, &mut adjacencies);
 
 	// Assign types to the rooms.
 
@@ -531,11 +531,11 @@ fn create_exits(
 
 	// Render doors and windows.
 
-	render_walls(&mut rng, &rooms, &adjacencies, &mut map);
+	render_walls(rng, &rooms, &adjacencies, map);
 
 	// Render floors.
 
-	render_rooms(level, &rooms, &mut map, &mut rng);
+	render_rooms(level, &rooms, map, rng);
 
     (rooms, adjacencies, pos_start)
 }
@@ -916,7 +916,7 @@ fn store_adjacencies_in_rooms(adjacencies: &Vec<Adjacency>, rooms: &mut Vec<Room
 	}
 }
 
-fn get_edge_sets(mut rng: &mut impl Rng, adjacencies: &[Adjacency]) -> Vec<Vec<usize>> {
+fn get_edge_sets(rng: &mut MyRng, adjacencies: &[Adjacency]) -> Vec<Vec<usize>> {
     let mut edge_sets = Vec::with_capacity(adjacencies.len());
 
     for (i, adj) in adjacencies.iter().enumerate() {
@@ -930,16 +930,16 @@ fn get_edge_sets(mut rng: &mut impl Rng, adjacencies: &[Adjacency]) -> Vec<Vec<u
         }
     }
 
-    edge_sets.shuffle(&mut rng);
+    edge_sets.shuffle(rng);
 
     edge_sets
 }
 
-fn connect_rooms(mut rng: &mut impl Rng, mut rooms: &mut Vec<Room>, adjacencies: &mut Vec<Adjacency>) -> Point {
+fn connect_rooms(rng: &mut MyRng, mut rooms: &mut Vec<Room>, adjacencies: &mut Vec<Adjacency>) -> Point {
 
     // Collect sets of edges that are mirrors of each other
 
-    let edge_sets = get_edge_sets(&mut rng, &adjacencies);
+    let edge_sets = get_edge_sets(rng, &adjacencies);
 
 	// Connect all adjacent courtyard rooms together.
 
@@ -1189,7 +1189,7 @@ const ONE_WAY_WINDOW: [CellType; 5] = [
 	CellType::OneWayWindowN,
 ];
 
-fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, mut map: &mut Map) {
+fn render_walls(rng: &mut MyRng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, map: &mut Map) {
 
 	// Render grass connecting courtyard rooms.
 
@@ -1303,16 +1303,16 @@ fn render_walls(rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacen
 
 			if room_type_left == RoomType::Exterior || room_type_right == RoomType::Exterior {
                 map.cells[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::PortcullisNS} else {CellType::PortcullisEW};
-                place_item(&mut map, p.x, p.y, if orient_ns {ItemKind::PortcullisNS} else {ItemKind::PortcullisEW});
+                place_item(map, p.x, p.y, if orient_ns {ItemKind::PortcullisNS} else {ItemKind::PortcullisEW});
             } else if room_type_left != RoomType::MasterSuite || room_type_right != RoomType::MasterSuite || install_master_suite_door {
                 map.cells[[p.x as usize, p.y as usize]].cell_type = if orient_ns {CellType::DoorNS} else {CellType::DoorEW};
-				place_item(&mut map, p.x, p.y, if orient_ns {ItemKind::DoorNS} else {ItemKind::DoorEW});
+				place_item(map, p.x, p.y, if orient_ns {ItemKind::DoorNS} else {ItemKind::DoorEW});
             }
 		}
 	}
 }
 
-fn render_rooms(level: i32, rooms: &Vec<Room>, mut map: &mut Map, rng: &mut impl Rng) {
+fn render_rooms(level: i32, rooms: &Vec<Room>, map: &mut Map, rng: &mut MyRng) {
     for i_room in 1..rooms.len() {
 		let room = &rooms[i_room];
 
@@ -1349,10 +1349,10 @@ fn render_rooms(level: i32, rooms: &Vec<Room>, mut map: &mut Map, rng: &mut impl
 					}
 				}
 			} else if dx >= 2 && dy >= 2 {
-				try_place_bush(&mut map, room.pos_min.x, room.pos_min.y);
-				try_place_bush(&mut map, room.pos_max.x - 1, room.pos_min.y);
-				try_place_bush(&mut map, room.pos_min.x, room.pos_max.y - 1);
-				try_place_bush(&mut map, room.pos_max.x - 1, room.pos_max.y - 1);
+				try_place_bush(map, room.pos_min.x, room.pos_min.y);
+				try_place_bush(map, room.pos_max.x - 1, room.pos_min.y);
+				try_place_bush(map, room.pos_min.x, room.pos_max.y - 1);
+				try_place_bush(map, room.pos_max.x - 1, room.pos_max.y - 1);
 			}
 		} else if room.room_type == RoomType::Interior || room.room_type == RoomType::MasterSuite {
 			if dx >= 5 && dy >= 5 {
@@ -1370,47 +1370,47 @@ fn render_rooms(level: i32, rooms: &Vec<Room>, mut map: &mut Map, rng: &mut impl
 				map.cells[[(room.pos_max.x - 2) as usize, (room.pos_max.y - 2) as usize]].cell_type = CellType::Wall0000;
 			} else if dx == 5 && dy >= 3 && (room.room_type == RoomType::Interior || rng.gen_range(0, 3) == 0) {
 				for y in 1..dy-1 {
-					place_item(&mut map, room.pos_min.x + 1, room.pos_min.y + y, ItemKind::Chair);
-					place_item(&mut map, room.pos_min.x + 2, room.pos_min.y + y, ItemKind::Table);
-					place_item(&mut map, room.pos_min.x + 3, room.pos_min.y + y, ItemKind::Chair);
+					place_item(map, room.pos_min.x + 1, room.pos_min.y + y, ItemKind::Chair);
+					place_item(map, room.pos_min.x + 2, room.pos_min.y + y, ItemKind::Table);
+					place_item(map, room.pos_min.x + 3, room.pos_min.y + y, ItemKind::Chair);
 				}
 			} else if dy == 5 && dx >= 3 && (room.room_type == RoomType::Interior || rng.gen_range(0, 3) == 0) {
 				for x in 1..dx-1 {
-					place_item(&mut map, room.pos_min.x + x, room.pos_min.y + 1, ItemKind::Chair);
-					place_item(&mut map, room.pos_min.x + x, room.pos_min.y + 2, ItemKind::Table);
-					place_item(&mut map, room.pos_min.x + x, room.pos_min.y + 3, ItemKind::Chair);
+					place_item(map, room.pos_min.x + x, room.pos_min.y + 1, ItemKind::Chair);
+					place_item(map, room.pos_min.x + x, room.pos_min.y + 2, ItemKind::Table);
+					place_item(map, room.pos_min.x + x, room.pos_min.y + 3, ItemKind::Chair);
 				}
 			} else if dx > dy && (dy & 1) == 1 && rng.gen_range(0, 3) != 0 {
 				let y = room.pos_min.y + dy / 2;
 
 				if room.room_type == RoomType::Interior {
-					try_place_table(&mut map, room.pos_min.x + 1, y);
-					try_place_table(&mut map, room.pos_max.x - 2, y);
+					try_place_table(map, room.pos_min.x + 1, y);
+					try_place_table(map, room.pos_max.x - 2, y);
 				} else {
-					try_place_chair(&mut map, room.pos_min.x + 1, y);
-					try_place_chair(&mut map, room.pos_max.x - 2, y);
+					try_place_chair(map, room.pos_min.x + 1, y);
+					try_place_chair(map, room.pos_max.x - 2, y);
 				}
 			} else if dy > dx && (dx & 1) == 1 && rng.gen_range(0, 3) != 0 {
 				let x = room.pos_min.x + dx / 2;
 
 				if room.room_type == RoomType::Interior {
-					try_place_table(&mut map, x, room.pos_min.y + 1);
-					try_place_table(&mut map, x, room.pos_max.y - 2);
+					try_place_table(map, x, room.pos_min.y + 1);
+					try_place_table(map, x, room.pos_max.y - 2);
 				} else {
-					try_place_chair(&mut map, x, room.pos_min.y + 1);
-					try_place_chair(&mut map, x, room.pos_max.y - 2);
+					try_place_chair(map, x, room.pos_min.y + 1);
+					try_place_chair(map, x, room.pos_max.y - 2);
 				}
 			} else if dx > 3 && dy > 3 {
 				if room.room_type == RoomType::Interior {
-					try_place_table(&mut map, room.pos_min.x, room.pos_min.y);
-					try_place_table(&mut map, room.pos_max.x - 1, room.pos_min.y);
-					try_place_table(&mut map, room.pos_min.x, room.pos_max.y - 1);
-					try_place_table(&mut map, room.pos_max.x - 1, room.pos_max.y - 1);
+					try_place_table(map, room.pos_min.x, room.pos_min.y);
+					try_place_table(map, room.pos_max.x - 1, room.pos_min.y);
+					try_place_table(map, room.pos_min.x, room.pos_max.y - 1);
+					try_place_table(map, room.pos_max.x - 1, room.pos_max.y - 1);
 				} else {
-					try_place_chair(&mut map, room.pos_min.x, room.pos_min.y);
-					try_place_chair(&mut map, room.pos_max.x - 1, room.pos_min.y);
-					try_place_chair(&mut map, room.pos_min.x, room.pos_max.y - 1);
-					try_place_chair(&mut map, room.pos_max.x - 1, room.pos_max.y - 1);
+					try_place_chair(map, room.pos_min.x, room.pos_min.y);
+					try_place_chair(map, room.pos_max.x - 1, room.pos_min.y);
+					try_place_chair(map, room.pos_min.x, room.pos_max.y - 1);
+					try_place_chair(map, room.pos_max.x - 1, room.pos_max.y - 1);
 				}
 			}
 		}
@@ -1437,7 +1437,7 @@ fn door_adjacent(map: &CellGrid, x: i32, y: i32) -> bool {
     false
 }
 
-fn try_place_bush(mut map: &mut Map, x: i32, y: i32) {
+fn try_place_bush(map: &mut Map, x: i32, y: i32) {
 	if map.cells[[x as usize, y as usize]].cell_type != CellType::GroundGrass {
 		return;
     }
@@ -1446,23 +1446,23 @@ fn try_place_bush(mut map: &mut Map, x: i32, y: i32) {
         return;
     }
 
-	place_item(&mut map, x, y, ItemKind::Bush);
+	place_item(map, x, y, ItemKind::Bush);
 }
 
-fn try_place_table(mut map: &mut Map, x: i32, y: i32) {
+fn try_place_table(map: &mut Map, x: i32, y: i32) {
     if door_adjacent(&map.cells, x, y) {
         return;
     }
 
-	place_item(&mut map, x, y, ItemKind::Table);
+	place_item(map, x, y, ItemKind::Table);
 }
 
-fn try_place_chair(mut map: &mut Map, x: i32, y: i32) {
+fn try_place_chair(map: &mut Map, x: i32, y: i32) {
     if door_adjacent(&map.cells, x, y) {
         return;
     }
 
-	place_item(&mut map, x, y, ItemKind::Chair);
+	place_item(map, x, y, ItemKind::Chair);
 }
 
 fn place_item(map: &mut Map, x: i32, y: i32, item_kind: ItemKind) {
@@ -1474,7 +1474,7 @@ fn place_item(map: &mut Map, x: i32, y: i32, item_kind: ItemKind) {
     );
 }
 
-fn place_loot(mut rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, mut map: &mut Map) {
+fn place_loot(rng: &mut MyRng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, map: &mut Map) {
 
 	// Count number of internal rooms.
 
@@ -1496,7 +1496,7 @@ fn place_loot(mut rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjac
 			continue;
         }
 
-		try_place_loot(&mut rng, room.pos_min, room.pos_max, &mut map);
+		try_place_loot(rng, room.pos_min, room.pos_max, map);
 	}
 
 	// Dead-end rooms automatically get loot.
@@ -1514,7 +1514,7 @@ fn place_loot(mut rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjac
 		}
 
 		if num_exits < 2 {
-			try_place_loot(&mut rng, room.pos_min, room.pos_max, &mut map);
+			try_place_loot(rng, room.pos_min, room.pos_max, map);
 		}
 	}
 
@@ -1523,7 +1523,7 @@ fn place_loot(mut rng: &mut impl Rng, rooms: &Vec<Room>, adjacencies: &Vec<Adjac
     let pos_min = Point::new(0, 0);
     let pos_max = Point::new(map.cells.extents()[0] as i32, map.cells.extents()[1] as i32);
     for _ in 0..(num_rooms / 4 + rng.gen_range(0, 4)) {
-		try_place_loot(&mut rng, pos_min, pos_max, &mut map);
+		try_place_loot(rng, pos_min, pos_max, map);
 	}
 }
 
@@ -1533,10 +1533,15 @@ fn is_item_at_pos(map: &Map, x: i32, y: i32) -> bool {
             return true;
         }
     }
+    for guard in &map.guards {
+        if guard.pos.x == x && guard.pos.y == y {
+            return true;
+        }
+    }
     return false;
 }
 
-fn try_place_loot(mut rng: &mut impl Rng, pos_min: Point, pos_max: Point, mut map: &mut Map)
+fn try_place_loot(rng: &mut MyRng, pos_min: Point, pos_max: Point, map: &mut Map)
 {
 	let dx = pos_max.x - pos_min.x;
 	let dy = pos_max.y - pos_min.y;
@@ -1554,12 +1559,12 @@ fn try_place_loot(mut rng: &mut impl Rng, pos_min: Point, pos_max: Point, mut ma
 			continue;
         }
 
-		place_item(&mut map, pos.x, pos.y, ItemKind::Coin);
+		place_item(map, pos.x, pos.y, ItemKind::Coin);
 		break;
 	}
 }
 
-fn place_exterior_bushes(rng: &mut impl Rng, mut map: &mut Map) {
+fn place_exterior_bushes(rng: &mut MyRng, map: &mut Map) {
 	let sx = map.cells.extents()[0] as i32;
 	let sy = map.cells.extents()[1] as i32;
 
@@ -1575,7 +1580,7 @@ fn place_exterior_bushes(rng: &mut impl Rng, mut map: &mut Map) {
 		}
 
 		if (x & 1) == 0 && rng.gen_range(0, 5) != 0 {
-			place_item(&mut map, x, sy - 1, ItemKind::Bush);
+			place_item(map, x, sy - 1, ItemKind::Bush);
 		}
 	}
 
@@ -1602,10 +1607,10 @@ fn place_exterior_bushes(rng: &mut impl Rng, mut map: &mut Map) {
 
 		if ((sy - y) & 1) != 0 {
 			if rng.gen_range(0, 5) != 0 {
-				place_item(&mut map, 0, y, ItemKind::Bush);
+				place_item(map, 0, y, ItemKind::Bush);
             }
 			if rng.gen_range(0, 5) != 0 {
-				place_item(&mut map, sx - 1, y, ItemKind::Bush);
+				place_item(map, sx - 1, y, ItemKind::Bush);
             }
 		}
 	}
@@ -1621,6 +1626,86 @@ fn place_front_pillars(map: &mut Map) {
 		map.cells[[(sx - x) as usize, 1]].cell_type = CellType::Wall0000;
         x += 5;
 	}
+}
+
+fn place_guards(rng: &mut MyRng, level: i32, rooms: &Vec<Room>, map: &mut Map) {
+	if level <= 0 {
+		return;
+    }
+
+	// Count number of internal rooms.
+
+	let mut num_rooms = 0;
+	for room in rooms.iter() {
+		if room.room_type == RoomType::Interior || room.room_type == RoomType::MasterSuite {
+			num_rooms += 1;
+        }
+	}
+
+	// Generate guards
+
+	let mut num_guards =
+        if level == 1 {
+            1
+        } else {
+            max(2, (num_rooms * min(level + 18, 40)) / 100)
+        };
+
+    while num_guards > 0 {
+        match generate_initial_guard_pos(rng, &map) {
+            None => break,
+            Some(pos) => {place_guard(map, pos); num_guards -= 1}
+        }
+	}
+}
+
+fn generate_initial_guard_pos(rng: &mut MyRng, map: &Map) -> Option<Point> {
+    let size_x = map.cells.extents()[0] as i32;
+    let size_y = map.cells.extents()[1] as i32;
+    for _ in 0..1000 {
+		let pos = Point::new(rng.gen_range(0, size_x), rng.gen_range(0, size_y));
+
+		let dpos = map.pos_start - pos;
+		if vector2d::Vector2D::dot(dpos, dpos) < 64 {
+			continue;
+        }
+
+		let cell_type = map.cells[[pos.x as usize, pos.y as usize]].cell_type;
+
+		if cell_type != CellType::GroundWood && cell_type != CellType::GroundMarble {
+			continue;
+        }
+
+		if is_item_at_pos(&map, pos.x, pos.y) {
+			continue;
+        }
+
+		return Some(pos);
+	}
+
+	return None;
+}
+
+fn place_guard(map: &mut Map, pos: Point) {
+    map.guards.push(
+        Guard {
+            pos: pos,
+            dir: Point::new(1, 0),
+            mode: GuardMode::Patrol,
+            speaking: false,
+            has_moved: false,
+            heard_thief: false,
+            hearing_guard: false,
+            heard_guard: false,
+            heard_guard_pos: pos,
+            goal: pos,
+            mode_timeout: 0,
+            region_goal: 0, // Map::invalidRegion
+            region_prev: 0, // Map::invalidRegion
+        }
+    );
+//	setupGoalRegion(map);
+//	m_dir = initialDir(map);
 }
 
 fn mark_exterior_as_seen(map: &mut Map) {

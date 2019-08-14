@@ -108,3 +108,12 @@ pub enum ItemKind {
     PortcullisNS,
     PortcullisEW,
 }
+
+pub fn is_guard_at(map: &Map, x: i32, y: i32) -> bool {
+    for guard in &map.guards {
+        if guard.pos.x == x && guard.pos.y == y {
+            return true;
+        }
+    }
+    return false;
+}
