@@ -44,7 +44,7 @@ type MyRng = rand_pcg::Pcg32;
 
 pub fn generate_map(seed: u64) -> Map {
     let mut rng = MyRng::seed_from_u64(seed);
-    let level = 4;
+    let level = 10;
     generate_siheyuan(level, &mut rng)
 }
 
@@ -907,7 +907,7 @@ fn compute_adjacencies
     adjacencies
 }
 
-fn store_adjacencies_in_rooms(adjacencies: &Vec<Adjacency>, rooms: &mut Vec<Room>) {
+fn store_adjacencies_in_rooms(adjacencies: &[Adjacency], rooms: &mut [Room]) {
     for (i, adj) in adjacencies.iter().enumerate() {
 		let i0 = adj.room_left;
 		let i1 = adj.room_right;
@@ -935,7 +935,7 @@ fn get_edge_sets(rng: &mut MyRng, adjacencies: &[Adjacency]) -> Vec<Vec<usize>> 
     edge_sets
 }
 
-fn connect_rooms(rng: &mut MyRng, mut rooms: &mut Vec<Room>, adjacencies: &mut Vec<Adjacency>) -> Point {
+fn connect_rooms(rng: &mut MyRng, mut rooms: &mut [Room], adjacencies: &mut [Adjacency]) -> Point {
 
     // Collect sets of edges that are mirrors of each other
 
@@ -1093,7 +1093,7 @@ fn connect_rooms(rng: &mut MyRng, mut rooms: &mut Vec<Room>, adjacencies: &mut V
     pos_start
 }
 
-fn join_groups(rooms: &mut Vec<Room>, group_from: usize, group_to: usize) {
+fn join_groups(rooms: &mut [Room], group_from: usize, group_to: usize) {
 	if group_from != group_to {
         for room in rooms.iter_mut() {
             if room.group == group_from {
@@ -1103,7 +1103,7 @@ fn join_groups(rooms: &mut Vec<Room>, group_from: usize, group_to: usize) {
     }
 }
 
-fn assign_room_types(room_index: &Array2D<usize>, adjacencies: &Vec<Adjacency>, rooms: &mut Vec<Room>) {
+fn assign_room_types(room_index: &Array2D<usize>, adjacencies: &[Adjacency], rooms: &mut [Room]) {
 
 	// Assign rooms depth based on distance from the bottom row of rooms.
 
@@ -1189,7 +1189,7 @@ const ONE_WAY_WINDOW: [CellType; 5] = [
 	CellType::OneWayWindowN,
 ];
 
-fn render_walls(rng: &mut MyRng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, map: &mut Map) {
+fn render_walls(rng: &mut MyRng, rooms: &[Room], adjacencies: &[Adjacency], map: &mut Map) {
 
 	// Render grass connecting courtyard rooms.
 
@@ -1312,7 +1312,7 @@ fn render_walls(rng: &mut MyRng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>
 	}
 }
 
-fn render_rooms(level: i32, rooms: &Vec<Room>, map: &mut Map, rng: &mut MyRng) {
+fn render_rooms(level: i32, rooms: &[Room], map: &mut Map, rng: &mut MyRng) {
     for i_room in 1..rooms.len() {
 		let room = &rooms[i_room];
 
@@ -1474,7 +1474,7 @@ fn place_item(map: &mut Map, x: i32, y: i32, item_kind: ItemKind) {
     );
 }
 
-fn place_loot(rng: &mut MyRng, rooms: &Vec<Room>, adjacencies: &Vec<Adjacency>, map: &mut Map) {
+fn place_loot(rng: &mut MyRng, rooms: &Vec<Room>, adjacencies: &[Adjacency], map: &mut Map) {
 
 	// Count number of internal rooms.
 
