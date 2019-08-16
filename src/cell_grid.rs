@@ -116,11 +116,41 @@ pub enum ItemKind {
     PortcullisEW,
 }
 
-pub fn is_guard_at(map: &Map, x: i32, y: i32) -> bool {
-    for guard in &map.guards {
-        if guard.pos.x == x && guard.pos.y == y {
-            return true;
-        }
+pub struct Player {
+    pub pos: Point,
+    pub dir: Point,
+	pub max_health: usize,
+	pub health: usize,
+	pub gold: usize,
+
+	pub noisy: bool, // did the player make noise last turn?
+	pub damaged_last_turn: bool,
+	pub finished_level: bool,
+
+	pub turns_remaining_underwater: usize,
+
+	pub seen: bool,
+
+	pub day: bool,
+	pub see_all: bool,
+	pub game_over: bool,
+}
+
+pub fn make_player(pos: &Point) -> Player {
+    let health = 5;
+    Player {
+        pos: *pos,
+        dir: Point::new(0, 0),
+        max_health: health,
+        health: health,
+        gold: 0,
+        noisy: false,
+        damaged_last_turn: false,
+        finished_level: false,
+        turns_remaining_underwater: 0,
+        seen: false,
+        day: false,
+        see_all: false,
+        game_over: false,
     }
-    return false;
 }

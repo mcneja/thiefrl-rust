@@ -1,7 +1,9 @@
 mod cell_grid;
+mod guard;
 mod random_map;
 
 use crate::cell_grid::*;
+use crate::guard::*;
 
 use quicksilver::{
     geom::{Rectangle, Vector},
@@ -82,16 +84,9 @@ fn tile_def(tile_type: CellType) -> Tile {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-struct Entity {
-    pos: Point,
-    tile: Tile,
-}
-
 struct Game {
     map: Map,
-    entities: Vec<Entity>,
-    player_id: usize,
+    player: Player,
     tileset: Asset<Vec<Image>>,
     tile_size_px: Vector,
 }
@@ -106,7 +101,7 @@ fn main() {
 }
 
 fn move_player(game: &mut Game, dx: i32, dy: i32) {
-    let player = &mut game.entities[game.player_id];
+    let player = &mut game.player;
     let pos_new = Point::new(player.pos.x + dx, player.pos.y + dy);
 
 	if !blocked(&game.map, &player.pos, &pos_new) {
@@ -200,14 +195,8 @@ impl State for Game {
 
         let random_seed = rand::random::<u64>();
 
-        let initial_state = random_map::generate_map(random_seed);
-        let mut entities = Vec::new();
-
-        let player_id = entities.len();
-        entities.push(Entity {
-            pos: initial_state.pos_start,
-            tile: Tile{ glyph: 208, color: color_preset::LIGHT_CYAN, blocks_player: false, ignores_lighting: false },
-        });
+        let map = random_map::generate_map(random_seed);
+        let player = make_player(&map.pos_start);
 
         let tile_size_px = Vector::new(16, 16);
 
@@ -225,9 +214,8 @@ impl State for Game {
         }));
 
         Ok(Self {
-            map: initial_state,
-            entities,
-            player_id,
+            map,
+            player,
             tileset,
             tile_size_px,
        })
@@ -265,9 +253,9 @@ impl State for Game {
         let map = &self.map;
         let map_size_x = map.cells.extents()[0];
         let map_size_y = map.cells.extents()[1];
-        let entities = &self.entities;
         let items = &self.map.items;
         let guards = &self.map.guards;
+        let player = &self.player;
         self.tileset.execute(|tileset| {
             for x in 0..map_size_x {
                 for y in 0..map_size_y {
@@ -295,13 +283,15 @@ impl State for Game {
                     Blended(&image, color),
                 );
             }
-            for entity in entities {
-                let image = &tileset[entity.tile.glyph];
-                let pos = Vector::new(entity.pos.x, (map_size_y - 1) as i32 - entity.pos.y);
+            {
+                let glyph = 208;
+                let color = color_preset::LIGHT_CYAN;
+                let image = &tileset[glyph];
+                let pos = Vector::new(player.pos.x, (map_size_y - 1) as i32 - player.pos.y);
                 let pos_px = offset_px + pos.times(tile_size_px);
                 window.draw(
                     &Rectangle::new(pos_px, image.area().size()),
-                    Blended(&image, entity.tile.color),
+                    Blended(&image, color),
                 );
             }
             for guard in guards {
