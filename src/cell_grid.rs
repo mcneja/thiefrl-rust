@@ -53,8 +53,15 @@ pub struct Cell {
 pub type CellGrid = multiarray::Array2D<Cell>;
 pub type Point = vector2d::Vector2D<i32>;
 
+pub struct Rect {
+    pub pos_min: Point,
+    pub pos_max: Point,
+}
+
 pub struct Map {
     pub cells: CellGrid,
+    pub patrol_regions: Vec<Rect>,
+    pub patrol_routes: Vec<(usize, usize)>,
     pub items: Vec<Item>,
     pub guards: Vec<Guard>,
     pub pos_start: Point,

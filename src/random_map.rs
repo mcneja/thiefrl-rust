@@ -10,6 +10,8 @@ const OUTER_BORDER: i32 = 3;
 const ROOM_SIZE_X: i32 = 5;
 const ROOM_SIZE_Y: i32 = 5;
 
+const INVALID_REGION: usize = std::usize::MAX;
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum RoomType
 {
@@ -88,6 +90,8 @@ fn generate_siheyuan(level: i32, rng: &mut MyRng) -> Map {
     let mut map = Map {
         cells: cells,
         items: Vec::new(),
+        patrol_regions: Vec::new(),
+        patrol_routes: Vec::new(),
         guards: Vec::new(),
         pos_start: Point::new(0, 0),
     };
@@ -522,12 +526,9 @@ fn create_exits(
 
     assign_room_types(&room_index, &adjacencies, &mut rooms);
 
-    /*
-
     // Generate pathing information.
 
-    generatePatrolRoutes(rooms, adjacencies, map);
-    */
+    generate_patrol_routes(map, &rooms, &adjacencies);
 
     // Render doors and windows.
 
@@ -1700,8 +1701,8 @@ fn place_guard(map: &mut Map, pos: Point) {
             heard_guard_pos: pos,
             goal: pos,
             mode_timeout: 0,
-            region_goal: 0, // Map::invalidRegion
-            region_prev: 0, // Map::invalidRegion
+            region_goal: INVALID_REGION,
+            region_prev: INVALID_REGION,
         }
     );
 //  setupGoalRegion(map);
@@ -1727,4 +1728,106 @@ fn mark_exterior_as_seen(map: &mut Map) {
             }
         }
     }
+}
+
+fn generate_patrol_routes(map: &mut Map, rooms: &[Room], adjacencies: &[Adjacency]) {
+    let mut include_room = vec![true; rooms.len()];
+
+    // Exclude exterior rooms.
+
+    for i_room in 0..rooms.len() {
+        if rooms[i_room].room_type == RoomType::Exterior {
+            include_room[i_room] = false;
+        }
+    }
+
+    // Trim dead ends out repeatedly until no more can be trimmed.
+
+    loop {
+        let mut trimmed = false;
+
+        for (i_room, room) in rooms.iter().enumerate() {
+            if !include_room[i_room] {
+                continue;
+            }
+
+            let mut num_exits = 0;
+            for i_adj in &room.edges {
+                let adj = &adjacencies[*i_adj];
+
+                if !adj.door {
+                    continue;
+                }
+
+                let i_room_other = if adj.room_left != i_room {adj.room_left} else {adj.room_right};
+
+                if include_room[i_room_other] {
+                    num_exits += 1;
+                }
+            }
+
+            if num_exits < 2 {
+                include_room[i_room] = false;
+                trimmed = true;
+            }
+        }
+
+        if !trimmed {
+            break;
+        }
+    }
+
+    // Generate patrol regions for included rooms.
+
+    let mut room_patrol_region = vec![INVALID_REGION; rooms.len()];
+
+    for i_room in 0..rooms.len() {
+        if include_room[i_room] {
+            room_patrol_region[i_room] = add_patrol_region(map, &rooms[i_room].pos_min, &rooms[i_room].pos_max);
+        }
+    }
+
+    // Add connections between included rooms.
+
+    for adj in adjacencies {
+        if !adj.door {
+            continue;
+        }
+
+        let region0 = room_patrol_region[adj.room_left];
+        let region1 = room_patrol_region[adj.room_right];
+
+        if region0 == INVALID_REGION || region1 == INVALID_REGION {
+            continue;
+        }
+
+        add_patrol_route(map, region0, region1);
+    }
+}
+
+fn add_patrol_region(map: &mut Map, pos_min: &Point, pos_max: &Point) -> usize {
+    let i_patrol_region = map.patrol_regions.len();
+
+    map.patrol_regions.push(
+        Rect {
+            pos_min: *pos_min,
+            pos_max: *pos_max,
+        }
+    );
+
+    // Plot the region into the map.
+
+    for x in pos_min.x..pos_max.x {
+        for y in pos_min.y..pos_max.y {
+            map.cells[[x as usize, y as usize]].region = i_patrol_region;
+        }
+    }
+
+    i_patrol_region
+}
+
+fn add_patrol_route(map: &mut Map, region0: usize, region1: usize) {
+    assert!(region0 < map.patrol_regions.len());
+    assert!(region1 < map.patrol_regions.len());
+    map.patrol_routes.push((region0, region1));
 }
