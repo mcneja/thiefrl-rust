@@ -40,10 +40,9 @@ struct Adjacency
     pub door: bool,
 }
 
-pub fn generate_map(seed: u64) -> Map {
-    let mut rng = MyRng::seed_from_u64(seed);
+pub fn generate_map(rng: &mut MyRng) -> Map {
     let level = 10;
-    generate_siheyuan(level, &mut rng)
+    generate_siheyuan(level, rng)
 }
 
 fn generate_siheyuan(level: i32, rng: &mut MyRng) -> Map {
@@ -1651,7 +1650,10 @@ fn place_guards(rng: &mut MyRng, level: i32, rooms: &Vec<Room>, map: &mut Map) {
     while num_guards > 0 {
         match generate_initial_guard_pos(rng, &map) {
             None => break,
-            Some(pos) => {place_guard(map, pos); num_guards -= 1}
+            Some(pos) => {
+                place_guard(rng, map, pos);
+                num_guards -= 1;
+            }
         }
     }
 }
@@ -1683,26 +1685,28 @@ fn generate_initial_guard_pos(rng: &mut MyRng, map: &Map) -> Option<Point> {
     return None;
 }
 
-fn place_guard(map: &mut Map, pos: Point) {
-    map.guards.push(
-        Guard {
-            pos: pos,
-            dir: Point::new(1, 0),
-            mode: GuardMode::Patrol,
-            speaking: false,
-            has_moved: false,
-            heard_thief: false,
-            hearing_guard: false,
-            heard_guard: false,
-            heard_guard_pos: pos,
-            goal: pos,
-            mode_timeout: 0,
-            region_goal: INVALID_REGION,
-            region_prev: INVALID_REGION,
-        }
-    );
-//  setupGoalRegion(map);
-//  m_dir = initialDir(map);
+fn place_guard(rng: &mut MyRng, map: &mut Map, pos: Point) {
+
+    let mut guard = Guard {
+        pos: pos,
+        dir: Point::new(1, 0),
+        mode: GuardMode::Patrol,
+        speaking: false,
+        has_moved: false,
+        heard_thief: false,
+        hearing_guard: false,
+        heard_guard: false,
+        heard_guard_pos: pos,
+        goal: pos,
+        mode_timeout: 0,
+        region_goal: INVALID_REGION,
+        region_prev: INVALID_REGION,
+    };
+
+    guard.setup_goal_region(rng, map);
+    guard.dir = guard.initial_dir(map);
+
+    map.guards.push(guard);
 }
 
 fn mark_exterior_as_seen(map: &mut Map) {

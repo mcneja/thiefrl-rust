@@ -326,7 +326,9 @@ pub fn guard_cell_cost(self: &Self, pos: &Point) -> usize {
 	let mut cost = guard_move_cost_for_tile_type(cell.cell_type);
 
     for item in &self.items {
-        cost = max(cost, guard_move_cost_for_item_kind(item.kind));
+        if item.pos == *pos {
+            cost = max(cost, guard_move_cost_for_item_kind(item.kind));
+        }
     }
 
 	cost
@@ -379,10 +381,13 @@ pub fn closest_region(self: &Self, pos: &Point) -> usize {
         }
     }
 
-    let mut heap = BinaryHeap::new();
+    let mut heap = BinaryHeap::with_capacity(self.cells.extents()[0] * self.cells.extents()[1]);
     let mut dist_field: Array2D<usize> = Array2D::new([self.cells.extents()[0], self.cells.extents()[1]], INFINITE_COST);
 
     heap.push(State{dist: 0, pos: *pos});
+
+    let size_x = self.cells.extents()[0] as i32;
+    let size_y = self.cells.extents()[1] as i32;
 
     while let Some(State {dist, pos}) = heap.pop() {
         let p = [pos.x as usize, pos.y as usize];
@@ -399,7 +404,7 @@ pub fn closest_region(self: &Self, pos: &Point) -> usize {
 
         for (move_dir_cost, dir) in &ADJACENT_MOVES {
             let pos_new = pos + *dir;
-            if pos_new.x < 0 || pos_new.y < 0 || pos_new.x >= self.cells.extents()[0] as i32 || pos_new.y >= self.cells.extents()[1] as i32 {
+            if pos_new.x < 0 || pos_new.y < 0 || pos_new.x >= size_x || pos_new.y >= size_y {
                 continue;
             }
 
@@ -467,8 +472,11 @@ pub fn compute_distance_field(self: &Self, initial_distances: &[(usize, Point)])
         }
     }
 
-    let mut heap = BinaryHeap::new();
+    let mut heap = BinaryHeap::with_capacity(self.cells.extents()[0] * self.cells.extents()[1]);
     let mut dist_field: Array2D<usize> = Array2D::new([self.cells.extents()[0], self.cells.extents()[1]], INFINITE_COST);
+
+    let size_x = self.cells.extents()[0] as i32;
+    let size_y = self.cells.extents()[1] as i32;
 
     for (dist, pos) in initial_distances {
         heap.push(State{dist: *dist, pos: *pos});
@@ -484,7 +492,7 @@ pub fn compute_distance_field(self: &Self, initial_distances: &[(usize, Point)])
 
         for (move_dir_cost, dir) in &ADJACENT_MOVES {
             let pos_new = pos + *dir;
-            if pos_new.x < 0 || pos_new.y < 0 || pos_new.x >= self.cells.extents()[0] as i32 || pos_new.y >= self.cells.extents()[1] as i32 {
+            if pos_new.x < 0 || pos_new.y < 0 || pos_new.x >= size_x || pos_new.y >= size_y {
                 continue;
             }
 

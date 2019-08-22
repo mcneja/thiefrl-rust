@@ -23,7 +23,7 @@ pub fn guard_act_all(rng: &mut MyRng, map: &mut Map, player: &mut Player) {
 
 	// Update each guard for this turn.
 
-    let mut guards = map.guards.split_off(map.guards.len());
+    let mut guards = map.guards.split_off(0);
 
     for mut guard in guards.drain(..) {
 		guard.act(rng, player, map);
@@ -87,12 +87,10 @@ fn act(self: &mut Self, rng: &mut MyRng, player: &mut Player, map: &Map) {
 		} else {
 			self.mode = GuardMode::ChaseVisibleTarget;
 		}
-	} else {
-		if self.mode == GuardMode::ChaseVisibleTarget {
-			self.mode = GuardMode::MoveToLastSighting;
-			self.mode_timeout = 3;
-			self.goal = player.pos;
-		}
+	} else if self.mode == GuardMode::ChaseVisibleTarget {
+		self.mode = GuardMode::MoveToLastSighting;
+		self.mode_timeout = 3;
+		self.goal = player.pos;
 	}
 
 	if self.mode != GuardMode::ChaseVisibleTarget {
@@ -269,7 +267,20 @@ fn patrol_step(self: &mut Self, map: &Map, player: &mut Player, rng: &mut MyRng)
 	}
 }
 
-pub fn move_toward_region(self: &mut Self, map: &Map, player: &Player) -> bool {
+pub fn initial_dir(self: &Self, map: &Map) -> Point
+{
+	if self.region_goal == INVALID_REGION {
+		return self.dir;
+	}
+
+	let distance_field = map.compute_distances_to_region(self.region_goal);
+
+	let pos_next = pos_next_best(map, &distance_field, &self.pos);
+
+	update_dir(self.dir, pos_next - self.pos)
+}
+
+fn move_toward_region(self: &mut Self, map: &Map, player: &Player) -> bool {
 	if self.region_goal == INVALID_REGION {
 		return false;
 	}
@@ -306,18 +317,18 @@ fn move_toward_goal(self: &mut Self, map: &Map, player: &Player) -> bool {
 	true
 }
 
-fn setup_goal_region(self: &mut Self, rng: &mut MyRng, map: &Map) {
-	let i_region_cur = map.cells[[self.pos.x as usize, self.pos.y as usize]].region;
+pub fn setup_goal_region(self: &mut Self, rng: &mut MyRng, map: &Map) {
+	let region_cur = map.cells[[self.pos.x as usize, self.pos.y as usize]].region;
 
-	if self.region_goal != INVALID_REGION && i_region_cur == self.region_prev {
+	if self.region_goal != INVALID_REGION && region_cur == self.region_prev {
 		return;
 	}
 
-	if i_region_cur != INVALID_REGION {
-		self.region_goal = map.random_neighbor_region(rng, i_region_cur, self.region_prev);
-		self.region_prev = i_region_cur;
-	} else {
+	if region_cur == INVALID_REGION {
 		self.region_goal = map.closest_region(&self.pos);
+	} else {
+		self.region_goal = map.random_neighbor_region(rng, region_cur, self.region_prev);
+		self.region_prev = region_cur;
 	}
 }
 

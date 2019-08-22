@@ -2,6 +2,7 @@ mod cell_grid;
 mod color_preset;
 mod guard;
 mod random_map;
+use rand::prelude::*;
 
 use crate::cell_grid::*;
 use crate::guard::*;
@@ -15,6 +16,7 @@ use quicksilver::{
 };
 
 struct Game {
+    rng: MyRng,
     map: Map,
     player: Player,
     tileset: Asset<Vec<Image>>,
@@ -30,25 +32,115 @@ fn main() {
     run::<Game>("ThiefRL 3", Vector::new(880, 760), settings);
 }
 
-fn move_player(game: &mut Game, dx: i32, dy: i32) {
+fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
     let player = &mut game.player;
+
+	// Can't move if you're dead.
+
+	if player.health == 0 {
+		return;
+    }
+
+	// Are we trying to exit the level?
+
     let pos_new = Point::new(player.pos.x + dx, player.pos.y + dy);
 
-	if !blocked(&game.map, &player.pos, &pos_new) {
-        player.pos = pos_new;
-    } else {
-        // Attempting to move diagonally; may be able to slide along a wall.
+/*
+	if !on_level(&map.cells, pos_new) && percent_map_seen(map) >= 100 && player.gold >= total_gold(map) {
+		s_level += 1;
+		init_level();
+		return;
+	}
+*/
 
-        let pos_slide_v = Point::new(player.pos.x, pos_new.y);
-        let pos_slide_h = Point::new(pos_new.x, player.pos.y);
-
-        if !blocked(&game.map, &player.pos, &pos_slide_v) {
-            player.pos = pos_slide_v;
+    if dx == 0 || dy == 0 {
+	    if blocked(&game.map, &player.pos, &pos_new) {
+            return;
         }
-        else if !blocked(&game.map, &player.pos, &pos_slide_h) {
-            player.pos = pos_slide_h;
+    } else if blocked(&game.map, &player.pos, &pos_new) {
+        if halts_slide(&game.map, &pos_new) {
+            return;
+        } else {
+            // Attempting to move diagonally; may be able to slide along a wall.
+
+			let v_blocked = blocked(&game.map, &player.pos, &(player.pos + Point::new(dx, 0)));
+			let h_blocked = blocked(&game.map, &player.pos, &(player.pos + Point::new(0, dy)));
+
+            if v_blocked {
+                if h_blocked {
+                    return;
+                }
+
+                dx = 0;
+            } else {
+                if !h_blocked {
+                    return;
+                }
+
+                dy = 0;
+            }
         }
 	}
+
+	pre_turn(game);
+
+    let dpos = Point::new(dx, dy);
+	game.player.dir = dpos;
+	game.player.pos += dpos;
+//	game.player.gold += collect_loot_at(game.map, game.player.pos);
+
+	// Generate movement noises.
+
+	let cell_type = game.map.cells[[game.player.pos.x as usize, game.player.pos.y as usize]].cell_type;
+
+	if cell_type == CellType::GroundWoodCreaky {
+//		make_noise(map, "\xae" "creak\xaf");
+	} else if cell_type == CellType::GroundGravel {
+//		make_noise(map, "\xae" "crunch\xaf");
+	}
+
+    advance_time(game);
+}
+
+fn halts_slide(map: &Map, pos: &Point) -> bool {
+    if pos.x < 0 || pos.x >= map.cells.extents()[0] as i32 || pos.y < 0 || pos.y >= map.cells.extents()[1] as i32 {
+        return false;
+    }
+
+    if is_guard_at(map, pos.x, pos.y) {
+        return true;
+    }
+
+    false
+}
+
+fn pre_turn(game: &mut Game) {
+//	s_show_msgs = true;
+//	s_bump_msg.clear();
+//	txt::clear();
+	game.player.noisy = false;
+	game.player.damaged_last_turn = false;
+	game.player.dir = Point::new(0, 0);
+}
+
+fn advance_time(game: &mut Game) {
+	if game.map.cells[[game.player.pos.x as usize, game.player.pos.y as usize]].cell_type == CellType::GroundWater {
+		if game.player.turns_remaining_underwater > 0 {
+			game.player.turns_remaining_underwater -= 1;
+        }
+	} else {
+		game.player.turns_remaining_underwater = 7;
+	}
+
+	guard_act_all(&mut game.rng, &mut game.map, &mut game.player);
+
+/*
+	map.recomputeVisibility(game.player.pos);
+
+	if percent_map_seen(game.map) >= 100 && game.player.gold >= total_gold(map) {
+		game.player.finished_level = true;
+	}
+*/
 }
 
 fn on_level(map: &CellGrid, pos: &Point) -> bool {
@@ -125,7 +217,8 @@ impl State for Game {
 
         let random_seed = rand::random::<u64>();
 
-        let map = random_map::generate_map(random_seed);
+        let mut rng = MyRng::seed_from_u64(random_seed);
+        let map = random_map::generate_map(&mut rng);
         let player = make_player(&map.pos_start);
 
         let tile_size_px = Vector::new(16, 16);
@@ -144,6 +237,7 @@ impl State for Game {
         }));
 
         Ok(Self {
+            rng,
             map,
             player,
             tileset,
@@ -235,6 +329,33 @@ impl State for Game {
                     Blended(&image, color)
                 );
             }
+
+/*
+            if let Some(guard) = guards.first() {
+                if guard.region_goal != INVALID_REGION {
+                	let distance_field = map.compute_distances_to_region(guard.region_goal);
+                    for x in 0..map_size_x {
+                        for y in 0..map_size_y {
+                            let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
+                            let d = distance_field[[x, y]];
+                            if d == 0 || d == INFINITE_COST {
+                                continue;
+                            }
+                            let digit = (d % 10) + 48;
+                            let band = d / 10;
+                            let image = &tileset[digit];
+                            let pos_px = offset_px + tile_size_px.times(pos);
+                            let color = if band == 0 {color_preset::WHITE} else if band == 1 {color_preset::LIGHT_YELLOW} else {color_preset::DARK_GRAY};
+                            window.draw(
+                                &Rectangle::new(pos_px, image.area().size()),
+                                Blended(&image, color),
+                            )
+                        }
+                    }
+                }
+            }
+*/
+
             Ok(())
         })?;
 
