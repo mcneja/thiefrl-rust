@@ -1,4 +1,5 @@
 mod cell_grid;
+mod color_preset;
 mod guard;
 mod random_map;
 
@@ -12,77 +13,6 @@ use quicksilver::{
     lifecycle::{run, Asset, Event, Settings, State, Window},
     Future, Result,
 };
-
-#[allow(dead_code)]
-mod color_preset {
-    use quicksilver::graphics::Color;
-
-    pub const BLACK: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 };
-    pub const DARK_BLUE: Color = Color { r: 0.0, g: 0.0, b: 0.6588, a: 1.0 };
-    pub const DARK_GREEN: Color = Color { r: 0.0, g: 0.6588, b: 0.0, a: 1.0 };
-    pub const DARK_CYAN: Color = Color { r: 0.0, g: 0.6588, b: 0.6588, a: 1.0 };
-    pub const DARK_RED: Color = Color { r: 0.6588, g: 0.0, b: 0.0, a: 1.0 };
-    pub const DARK_MAGENTA: Color = Color { r: 0.6588, g: 0.0, b: 0.6588, a: 1.0 };
-    pub const DARK_BROWN: Color = Color { r: 0.6588, g: 0.3294, b: 0.0, a: 1.0 };
-    pub const LIGHT_GRAY: Color = Color { r: 0.6588, g: 0.6588, b: 0.6588, a: 1.0 };
-    pub const DARK_GRAY: Color = Color { r: 0.3294, g: 0.3294, b: 0.3294, a: 1.0 };
-    pub const LIGHT_BLUE: Color = Color { r: 0.3294, g: 0.3294, b: 0.9961, a: 1.0 };
-    pub const LIGHT_GREEN: Color = Color { r: 0.3294, g: 0.9961, b: 0.3294, a: 1.0 };
-    pub const LIGHT_CYAN: Color = Color { r: 0.3294, g: 0.9961, b: 0.9961, a: 1.0 };
-    pub const LIGHT_RED: Color = Color { r: 0.9961, g: 0.3294, b: 0.3294, a: 1.0 };
-    pub const LIGHT_MAGENTA: Color = Color { r: 0.9961, g: 0.3294, b: 0.9961, a: 1.0 };
-    pub const LIGHT_YELLOW: Color = Color { r: 0.9961, g: 0.9961, b: 0.3264, a: 1.0 };
-    pub const WHITE: Color = Color { r: 0.9961, g: 0.9961, b: 0.9961, a: 1.0 };
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct Tile {
-    glyph: usize,
-    color: Color,
-    blocks_player: bool,
-    ignores_lighting: bool
-}
-
-fn tile_def(tile_type: CellType) -> Tile {
-    match tile_type {
-        CellType::GroundNormal     => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: false },
-        CellType::GroundGravel     => Tile { glyph: 130, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: false },
-        CellType::GroundGrass      => Tile { glyph: 132, color: color_preset::DARK_GREEN, blocks_player: false, ignores_lighting: false },
-        CellType::GroundWater      => Tile { glyph: 134, color: color_preset::LIGHT_BLUE, blocks_player: false, ignores_lighting: false },
-        CellType::GroundMarble     => Tile { glyph: 136, color: color_preset::DARK_CYAN, blocks_player: false, ignores_lighting: false },
-        CellType::GroundWood       => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false, ignores_lighting: false },
-        CellType::GroundWoodCreaky => Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false, ignores_lighting: false },
-
-                  //  NSEW
-        CellType::Wall0000 => Tile { glyph: 176, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall0001 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall0010 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall0011 => Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall0100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall0101 => Tile { glyph: 179, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall0110 => Tile { glyph: 182, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall0111 => Tile { glyph: 185, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall1000 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall1001 => Tile { glyph: 180, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall1010 => Tile { glyph: 181, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall1011 => Tile { glyph: 184, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall1100 => Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall1101 => Tile { glyph: 186, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall1110 => Tile { glyph: 183, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-        CellType::Wall1111 => Tile { glyph: 187, color: color_preset::LIGHT_GRAY, blocks_player: true, ignores_lighting: true },
-
-        CellType::OneWayWindowE => Tile { glyph: 196, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::OneWayWindowW => Tile { glyph: 197, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::OneWayWindowN => Tile { glyph: 198, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::OneWayWindowS => Tile { glyph: 199, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::PortcullisNS  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::PortcullisEW  => Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::WindowNS      => Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::WindowEW      => Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::DoorNS        => Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-        CellType::DoorEW        => Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false, ignores_lighting: true },
-    }
-}
 
 struct Game {
     map: Map,

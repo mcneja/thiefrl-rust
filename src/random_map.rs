@@ -10,8 +10,6 @@ const OUTER_BORDER: i32 = 3;
 const ROOM_SIZE_X: i32 = 5;
 const ROOM_SIZE_Y: i32 = 5;
 
-const INVALID_REGION: usize = std::usize::MAX;
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum RoomType
 {
@@ -41,8 +39,6 @@ struct Adjacency
     pub next_matching: usize,
     pub door: bool,
 }
-
-type MyRng = rand_pcg::Pcg32;
 
 pub fn generate_map(seed: u64) -> Map {
     let mut rng = MyRng::seed_from_u64(seed);
