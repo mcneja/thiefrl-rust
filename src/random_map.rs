@@ -295,7 +295,7 @@ fn plot_walls(inside: &Array2D<bool>, offset_x: &Array2D<i32>, offset_y: &Array2
         lit: false,
         seen: false,
         visited: false,
-        region: 0,
+        region: INVALID_REGION,
         visit_stamp: 0,
     };
     let mut map = CellGrid::new([map_x as usize, map_y as usize], default_cell);

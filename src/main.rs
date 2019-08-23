@@ -356,6 +356,41 @@ impl State for Game {
             }
 */
 
+/*
+            if let Some(guard) = guards.first() {
+                let image = &tileset[255];
+                if guard.region_prev != INVALID_REGION {
+
+                    let region = &map.patrol_regions[guard.region_prev];
+                    for x in region.pos_min.x .. region.pos_max.x {
+                        for y in region.pos_min.y .. region.pos_max.y {
+                            let pos = Vector::new(x as f32, ((map_size_y - 1) as i32 - y) as f32);
+                            let pos_px = offset_px + tile_size_px.times(pos);
+                            let color = Color {r:1.0, g:0.0, b:0.0, a:0.25};
+                            window.draw(
+                                &Rectangle::new(pos_px, image.area().size()),
+                                Blended(&image, color),
+                            )
+                        }
+                    }
+                }
+                if guard.region_goal != INVALID_REGION {
+                    let region = &map.patrol_regions[guard.region_goal];
+                    for x in region.pos_min.x .. region.pos_max.x {
+                        for y in region.pos_min.y .. region.pos_max.y {
+                            let pos = Vector::new(x as f32, ((map_size_y - 1) as i32 - y) as f32);
+                            let pos_px = offset_px + tile_size_px.times(pos);
+                            let color = Color {r:0.0, g:1.0, b:0.0, a:0.25};
+                            window.draw(
+                                &Rectangle::new(pos_px, image.area().size()),
+                                Blended(&image, color),
+                            )
+                        }
+                    }
+                }
+            }
+*/
+
             Ok(())
         })?;
 

@@ -336,6 +336,8 @@ pub fn guard_move_cost(self: &Self, pos_old: Point, pos_new: Point) -> usize {
 		return cost;
     }
 
+    // Guards are not allowed to move diagonally around corners.
+
 	if pos_old.x != pos_new.x &&
         pos_old.y != pos_new.y &&
 		(self.guard_cell_cost(pos_old.x as usize, pos_new.y as usize) == INFINITE_COST ||
