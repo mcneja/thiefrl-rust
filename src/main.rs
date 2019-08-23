@@ -319,7 +319,13 @@ impl State for Game {
                 );
             }
             for guard in guards {
-                let glyph = 212;
+                let glyph =
+                    if guard.dir.y > 0 {210}
+                    else if guard.dir.y < 0 {212}
+                    else if guard.dir.x > 0 {209}
+                    else if guard.dir.x < 0 {211}
+                    else {212};
+
                 let image = &tileset[glyph];
                 let pos = Vector::new(guard.pos.x, (map_size_y - 1) as i32 - guard.pos.y);
                 let pos_px = offset_px + pos.times(tile_size_px);
