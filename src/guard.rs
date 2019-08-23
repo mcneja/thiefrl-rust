@@ -236,15 +236,14 @@ fn sees_thief(self: &Self, map: &Map, player: &Player) -> bool {
 		return false;
     }
 
-/*
+	let player_is_lit = map.cells[[player.pos.x as usize, player.pos.y as usize]].lit;
+
 	let d2 = vector2d::Vector2D::dot(d, d);
-	if d2 >= sightCutoff(player.lit(map)) {
+	if d2 >= self.sight_cutoff(player_is_lit) {
 		return false;
     }
-*/
 
-//	if !player.hidden(map) && line_of_sight(map, self.pos, player.pos) {
-	if line_of_sight(map, self.pos, player.pos) {
+	if !player.hidden(map) && line_of_sight(map, self.pos, player.pos) {
 		return true;
     }
 
@@ -253,6 +252,18 @@ fn sees_thief(self: &Self, map: &Map, player: &Player) -> bool {
     }
 
 	return false;
+}
+
+fn cutoff_lit(self: &Self) -> i32 {
+	if self.mode == GuardMode::Patrol {40} else {75}
+}
+
+fn cutoff_unlit(self: &Self) -> i32 {
+	if self.mode == GuardMode::Patrol {3} else {33}
+}
+
+fn sight_cutoff(self: &Self, lit_target: bool) -> i32 {
+	if lit_target {self.cutoff_lit()} else {self.cutoff_unlit()}
 }
 
 fn patrol_step(self: &mut Self, map: &Map, player: &mut Player, rng: &mut MyRng) {
