@@ -241,11 +241,12 @@ fn sees_thief(self: &Self, map: &Map, player: &Player) -> bool {
 	if d2 >= sightCutoff(player.lit(map)) {
 		return false;
     }
+*/
 
-	if !player.hidden(map) && line_of_sight(map, self.pos, player.pos) {
+//	if !player.hidden(map) && line_of_sight(map, self.pos, player.pos) {
+	if line_of_sight(map, self.pos, player.pos) {
 		return true;
     }
-*/
 
 	if self.mode != GuardMode::Patrol && d.x.abs() < 2 && d.y.abs() < 2 {
 		return true;
@@ -353,4 +354,43 @@ fn update_dir(dir_forward: Point, dir_aim: Point) -> Point {
 	} else {
 		if dot_left >= 0 {dir_left} else {-dir_left}
 	}
+}
+
+fn line_of_sight(map: &Map, from: Point, to: Point) -> bool {
+	let mut x = from.x;
+	let mut y = from.y;
+
+	let dx = to.x - x;
+	let dy = to.y - y;
+
+	let mut ax = dx.abs();
+	let mut ay = dy.abs();
+
+	let x_inc = if dx > 0 {1} else {-1};
+	let y_inc = if dy > 0 {1} else {-1};
+
+	let mut error = ay - ax;
+
+	let mut n = ax + ay - 1;
+
+	ax *= 2;
+	ay *= 2;
+
+	while n > 0 {
+		if error > 0 {
+			y += y_inc;
+			error -= ax;
+		} else {
+			x += x_inc;
+			error += ay;
+		}
+
+		if map.blocks_sight(x, y) {
+			return false;
+		}
+
+		n -= 1;
+	}
+
+	true
 }
