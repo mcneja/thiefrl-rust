@@ -314,19 +314,14 @@ pub fn random_neighbor_region(self: &Self, rng: &mut MyRng, region: usize, regio
 	return neighbors[rng.gen_range(0, neighbors.len())];
 }
 
-pub fn guard_cell_cost(self: &Self, pos: &Point) -> usize {
-    let size_x = self.cells.extents()[0] as i32;
-    let size_y = self.cells.extents()[1] as i32;
-	if pos.x < 0 || pos.x >= size_x || pos.y < 0 || pos.y >= size_y {
-   		return INFINITE_COST;
+pub fn guard_cell_cost(self: &Self, x: usize, y: usize) -> usize {
+	let mut cost = guard_move_cost_for_tile_type(self.cells[[x, y]].cell_type);
+    if cost == INFINITE_COST {
+        return INFINITE_COST;
     }
 
-	let cell = &self.cells[[pos.x as usize, pos.y as usize]];
-
-	let mut cost = guard_move_cost_for_tile_type(cell.cell_type);
-
     for item in &self.items {
-        if item.pos == *pos {
+        if item.pos.x as usize == x && item.pos.y as usize == y {
             cost = max(cost, guard_move_cost_for_item_kind(item.kind));
         }
     }
@@ -334,8 +329,8 @@ pub fn guard_cell_cost(self: &Self, pos: &Point) -> usize {
 	cost
 }
 
-pub fn guard_move_cost(self: &Self, pos_old: &Point, pos_new: &Point) -> usize {
-	let cost = self.guard_cell_cost(&pos_new);
+pub fn guard_move_cost(self: &Self, pos_old: Point, pos_new: Point) -> usize {
+	let cost = self.guard_cell_cost(pos_new.x as usize, pos_new.y as usize);
 
 	if cost == INFINITE_COST {
 		return cost;
@@ -343,17 +338,17 @@ pub fn guard_move_cost(self: &Self, pos_old: &Point, pos_new: &Point) -> usize {
 
 	if pos_old.x != pos_new.x &&
         pos_old.y != pos_new.y &&
-		(self.guard_cell_cost(&Point::new(pos_old.x, pos_new.y)) == INFINITE_COST ||
-		self.guard_cell_cost(&Point::new(pos_new.x, pos_old.y)) == INFINITE_COST) {
+		(self.guard_cell_cost(pos_old.x as usize, pos_new.y as usize) == INFINITE_COST ||
+		self.guard_cell_cost(pos_new.x as usize, pos_old.y as usize) == INFINITE_COST) {
 		return INFINITE_COST;
 	}
 
 	cost
 }
 
-pub fn pos_blocked_by_guard(self: &Self, pos: &Point) -> bool {
+pub fn pos_blocked_by_guard(self: &Self, pos: Point) -> bool {
 	for guard in &self.guards {
-		if guard.pos == *pos {
+		if guard.pos == pos {
 			return true;
 		}
 	}
@@ -396,7 +391,7 @@ pub fn closest_region(self: &Self, pos: &Point) -> usize {
             return self.cells[p].region;
         }
 
-        if dist > dist_field[p] {
+        if dist >= dist_field[p] {
             continue;
         }
 
@@ -408,7 +403,7 @@ pub fn closest_region(self: &Self, pos: &Point) -> usize {
                 continue;
             }
 
-            let move_cost = self.guard_move_cost(&pos, &pos_new);
+            let move_cost = self.guard_move_cost(pos, pos_new);
             if move_cost == INFINITE_COST {
                 continue;
             }
@@ -435,21 +430,21 @@ pub fn compute_distances_to_region(self: &Self, i_region_goal: usize) -> Array2D
 
     for x in region.pos_min.x .. region.pos_max.x {
         for y in region.pos_min.y .. region.pos_max.y {
-            let p = Point { x, y };
-            goal.push((self.guard_cell_cost(&p), p));
+            let p = Point{x, y};
+            goal.push((self.guard_cell_cost(x as usize, y as usize), p));
         }
     }
 
     self.compute_distance_field(&goal)
 }
 
-pub fn compute_distances_to_position(self: &Self, pos_goal: &Point) -> Array2D<usize> {
+pub fn compute_distances_to_position(self: &Self, pos_goal: Point) -> Array2D<usize> {
 	assert!(pos_goal.x >= 0);
 	assert!(pos_goal.y >= 0);
 	assert!(pos_goal.x < self.cells.extents()[0] as i32);
 	assert!(pos_goal.y < self.cells.extents()[1] as i32);
 
-    self.compute_distance_field(&[(0, *pos_goal)])
+    self.compute_distance_field(&[(0, pos_goal)])
 }
 
 pub fn compute_distance_field(self: &Self, initial_distances: &[(usize, Point)]) -> Array2D<usize> {
@@ -484,7 +479,7 @@ pub fn compute_distance_field(self: &Self, initial_distances: &[(usize, Point)])
 
     while let Some(State {dist, pos}) = heap.pop() {
         let p = [pos.x as usize, pos.y as usize];
-        if dist > dist_field[p] {
+        if dist >= dist_field[p] {
             continue;
         }
 
@@ -496,14 +491,14 @@ pub fn compute_distance_field(self: &Self, initial_distances: &[(usize, Point)])
                 continue;
             }
 
-            let move_cost = self.guard_move_cost(&pos, &pos_new);
+            let move_cost = self.guard_move_cost(pos, pos_new);
             if move_cost == INFINITE_COST {
                 continue;
             }
 
             let dist_new = dist + move_cost + move_dir_cost;
-
-            if dist_new < dist_field[[pos_new.x as usize, pos_new.y as usize]] {
+            let p_new = [pos_new.x as usize, pos_new.y as usize];
+            if dist_new < dist_field[p_new] {
                 heap.push(State{dist: dist_new, pos: pos_new});
             }
         }

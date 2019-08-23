@@ -31,9 +31,9 @@ pub fn guard_act_all(rng: &mut MyRng, map: &mut Map, player: &mut Player) {
 	}
 }
 
-fn pos_next_best(map: &Map, distance_field: &Array2D<usize>, pos_from: &Point) -> Point {
+fn pos_next_best(map: &Map, distance_field: &Array2D<usize>, pos_from: Point) -> Point {
 	let mut cost_best = INFINITE_COST;
-	let mut pos_best = *pos_from;
+	let mut pos_best = pos_from;
 
 	let pos_min = Point::new(max(0, pos_from.x - 1), max(0, pos_from.y - 1));
 	let pos_max = Point::new(min(map.cells.extents()[0] as i32, pos_from.x + 2), min(map.cells.extents()[1] as i32, pos_from.y + 2));
@@ -45,8 +45,12 @@ fn pos_next_best(map: &Map, distance_field: &Array2D<usize>, pos_from: &Point) -
 				continue;
 			}
 
-			let pos = Point::new(x, y);
-			if map.pos_blocked_by_guard(&pos) {
+			let pos = Point{x, y};
+			if map.guard_move_cost(pos_from, pos) == INFINITE_COST {
+				continue;
+			}
+
+			if map.pos_blocked_by_guard(pos) {
 				continue;
 			}
 
@@ -275,7 +279,7 @@ pub fn initial_dir(self: &Self, map: &Map) -> Point
 
 	let distance_field = map.compute_distances_to_region(self.region_goal);
 
-	let pos_next = pos_next_best(map, &distance_field, &self.pos);
+	let pos_next = pos_next_best(map, &distance_field, self.pos);
 
 	update_dir(self.dir, pos_next - self.pos)
 }
@@ -287,7 +291,7 @@ fn move_toward_region(self: &mut Self, map: &Map, player: &Player) -> bool {
 
 	let distance_field = map.compute_distances_to_region(self.region_goal);
 
-	let pos_next = pos_next_best(map, &distance_field, &self.pos);
+	let pos_next = pos_next_best(map, &distance_field, self.pos);
 
 	if player.pos == pos_next {
 		return true;
@@ -300,9 +304,9 @@ fn move_toward_region(self: &mut Self, map: &Map, player: &Player) -> bool {
 }
 
 fn move_toward_goal(self: &mut Self, map: &Map, player: &Player) -> bool {
-	let dist_field = map.compute_distances_to_position(&self.goal);
+	let dist_field = map.compute_distances_to_position(self.goal);
 
-	let pos_next = pos_next_best(map, &dist_field, &self.pos);
+	let pos_next = pos_next_best(map, &dist_field, self.pos);
 	if pos_next == self.pos {
 		return false;
     }
