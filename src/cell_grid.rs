@@ -53,6 +53,8 @@ pub struct Cell {
     pub cell_type: CellType,
     pub move_cost: usize,
     pub region: usize,
+    pub blocks_sight: bool,
+    pub hides_player: bool,
     pub lit: bool,
     pub seen: bool,
 }
@@ -506,43 +508,11 @@ pub fn compute_distance_field(self: &Self, initial_distances: &[(usize, Point)])
 }
 
 pub fn blocks_sight(self: &Self, x: i32, y: i32) -> bool {
-    let cell_type = self.cells[[x as usize, y as usize]].cell_type;
-    let tile = tile_def(cell_type);
-    if tile.blocks_sight {
-        return true;
-    }
-
-/*
-	const Cell & cell = at(x, y);
-
-	for (const Item * item = cell.items; item; item = item->next())
-	{
-		if (item->cell_info().blocks_sight)
-			return true;
-	}
-*/
-
-	false
+    self.cells[[x as usize, y as usize]].blocks_sight
 }
 
 pub fn hides_player(self: &Self, x: i32, y: i32) -> bool {
-    let cell_type = self.cells[[x as usize, y as usize]].cell_type;
-    let tile = tile_def(cell_type);
-    if tile.hides_player {
-        return true;
-    }
-
-/*
-	const Cell & cell = at(x, y);
-
-	for (const Item * item = cell.items; item; item = item->next())
-	{
-		if (item->cell_info().hides_player)
-			return true;
-	}
-*/
-
-	false
+    self.cells[[x as usize, y as usize]].hides_player
 }
 
 }

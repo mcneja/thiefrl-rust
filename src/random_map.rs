@@ -120,7 +120,7 @@ fn generate_siheyuan(level: i32, rng: &mut MyRng) -> Map {
 
     mark_exterior_as_seen(&mut map);
 
-    compute_cell_costs(&mut map);
+    cache_cell_info(&mut map);
 
     map
 }
@@ -295,6 +295,8 @@ fn plot_walls(inside: &Array2D<bool>, offset_x: &Array2D<i32>, offset_y: &Array2
         cell_type: CellType::GroundNormal,
         move_cost: 0,
         region: INVALID_REGION,
+        blocks_sight: false,
+        hides_player: false,
         lit: false,
         seen: false,
     };
@@ -1728,20 +1730,27 @@ fn mark_exterior_as_seen(map: &mut Map) {
     }
 }
 
-fn compute_cell_costs(map: &mut Map) {
+fn cache_cell_info(map: &mut Map) {
     let sx = map.cells.extents()[0];
     let sy = map.cells.extents()[1];
 
     for x in 0..sx {
         for y in 0..sy {
             let cell = &mut map.cells[[x, y]];
-            cell.move_cost = guard_move_cost_for_tile_type(cell.cell_type);
+            let cell_type = cell.cell_type;
+            let tile = tile_def(cell_type);
+            cell.move_cost = guard_move_cost_for_tile_type(cell_type);
+            cell.blocks_sight = tile.blocks_sight;
+            cell.hides_player = tile.hides_player;
         }
     }
 
     for item in &map.items {
         let cell = &mut map.cells[[item.pos.x as usize, item.pos.y as usize]];
-        cell.move_cost = max(cell.move_cost, guard_move_cost_for_item_kind(item.kind));
+        let kind = item.kind;
+        cell.move_cost = max(cell.move_cost, guard_move_cost_for_item_kind(kind));
+        cell.blocks_sight = kind == ItemKind::DoorNS || kind == ItemKind::DoorEW || kind == ItemKind::Bush;
+        cell.hides_player = kind == ItemKind::Table || kind == ItemKind::Bush;
     }
 }
 
