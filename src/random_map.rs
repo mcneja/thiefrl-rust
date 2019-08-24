@@ -120,6 +120,8 @@ fn generate_siheyuan(level: i32, rng: &mut MyRng) -> Map {
 
     mark_exterior_as_seen(&mut map);
 
+    compute_cell_costs(&mut map);
+
     map
 }
 
@@ -291,12 +293,10 @@ fn plot_walls(inside: &Array2D<bool>, offset_x: &Array2D<i32>, offset_y: &Array2
 
     let default_cell = Cell {
         cell_type: CellType::GroundNormal,
-        visible: false,
+        move_cost: 0,
+        region: INVALID_REGION,
         lit: false,
         seen: false,
-        visited: false,
-        region: INVALID_REGION,
-        visit_stamp: 0,
     };
     let mut map = CellGrid::new([map_x as usize, map_y as usize], default_cell);
 
@@ -430,8 +430,6 @@ fn is_wall(cell_type: CellType) -> bool {
         CellType::OneWayWindowS => true,
         CellType::PortcullisNS  => true,
         CellType::PortcullisEW  => true,
-        CellType::WindowNS      => true,
-        CellType::WindowEW      => true,
         CellType::DoorNS        => true,
         CellType::DoorEW        => true,
     }
@@ -1727,6 +1725,23 @@ fn mark_exterior_as_seen(map: &mut Map) {
                 map.cells[[x, y]].seen = true;
             }
         }
+    }
+}
+
+fn compute_cell_costs(map: &mut Map) {
+    let sx = map.cells.extents()[0];
+    let sy = map.cells.extents()[1];
+
+    for x in 0..sx {
+        for y in 0..sy {
+            let cell = &mut map.cells[[x, y]];
+            cell.move_cost = guard_move_cost_for_tile_type(cell.cell_type);
+        }
+    }
+
+    for item in &map.items {
+        let cell = &mut map.cells[[item.pos.x as usize, item.pos.y as usize]];
+        cell.move_cost = max(cell.move_cost, guard_move_cost_for_item_kind(item.kind));
     }
 }
 

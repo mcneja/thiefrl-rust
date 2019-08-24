@@ -1,7 +1,6 @@
 use crate::color_preset;
 use multiarray::Array2D;
 use rand::Rng;
-use std::cmp::max;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
@@ -42,8 +41,6 @@ pub enum CellType {
     OneWayWindowS,
     PortcullisNS,
     PortcullisEW,
-    WindowNS,
-    WindowEW,
     DoorNS,
     DoorEW,
 }
@@ -54,12 +51,10 @@ pub const INFINITE_COST: usize = std::usize::MAX;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cell {
     pub cell_type: CellType,
-    pub visible: bool,
+    pub move_cost: usize,
+    pub region: usize,
     pub lit: bool,
     pub seen: bool,
-    pub visited: bool,
-    pub region: usize,
-    pub visit_stamp: usize,
 }
 
 pub type CellGrid = Array2D<Cell>;
@@ -192,8 +187,6 @@ pub fn tile_def(tile_type: CellType) -> &'static Tile {
         CellType::OneWayWindowS => &Tile { glyph: 199, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, hides_player: false, ignores_lighting: true },
         CellType::PortcullisNS  => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, hides_player: false, ignores_lighting: true },
         CellType::PortcullisEW  => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, hides_player: false, ignores_lighting: true },
-        CellType::WindowNS      => &Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, hides_player: false, ignores_lighting: true },
-        CellType::WindowEW      => &Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, hides_player: false, ignores_lighting: true },
         CellType::DoorNS        => &Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, hides_player: false, ignores_lighting: true },
         CellType::DoorEW        => &Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, hides_player: false, ignores_lighting: true },
     }
@@ -230,8 +223,6 @@ pub fn guard_move_cost_for_tile_type(tile_type: CellType) -> usize {
         CellType::OneWayWindowS    => INFINITE_COST,
         CellType::PortcullisNS     => 0,
         CellType::PortcullisEW     => 0,
-        CellType::WindowNS         => 0,
-        CellType::WindowEW         => 0,
         CellType::DoorNS           => 0,
         CellType::DoorEW           => 0,
     }
@@ -330,19 +321,8 @@ pub fn random_neighbor_region(self: &Self, rng: &mut MyRng, region: usize, regio
 	return neighbors[rng.gen_range(0, neighbors.len())];
 }
 
-pub fn guard_cell_cost(self: &Self, x: usize, y: usize) -> usize {
-	let mut cost = guard_move_cost_for_tile_type(self.cells[[x, y]].cell_type);
-    if cost == INFINITE_COST {
-        return INFINITE_COST;
-    }
-
-    for item in &self.items {
-        if item.pos.x as usize == x && item.pos.y as usize == y {
-            cost = max(cost, guard_move_cost_for_item_kind(item.kind));
-        }
-    }
-
-	cost
+fn guard_cell_cost(self: &Self, x: usize, y: usize) -> usize {
+    self.cells[[x, y]].move_cost
 }
 
 pub fn guard_move_cost(self: &Self, pos_old: Point, pos_new: Point) -> usize {
