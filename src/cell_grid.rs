@@ -204,7 +204,7 @@ pub fn guard_move_cost_for_tile_type(tile_type: CellType) -> usize {
         CellType::GroundNormal     => 0,
         CellType::GroundGravel     => 2,
         CellType::GroundGrass      => 0,
-        CellType::GroundWater      => INFINITE_COST,
+        CellType::GroundWater      => 4096,
         CellType::GroundMarble     => 0,
         CellType::GroundWood       => 0,
         CellType::GroundWoodCreaky => 0,

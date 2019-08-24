@@ -50,6 +50,10 @@ fn pos_next_best(map: &Map, distance_field: &Array2D<usize>, pos_from: Point) ->
 				continue;
 			}
 
+			if map.cells[[pos.x as usize, pos.y as usize]].cell_type == CellType::GroundWater {
+				continue;
+			}
+
 			if map.pos_blocked_by_guard(pos) {
 				continue;
 			}
