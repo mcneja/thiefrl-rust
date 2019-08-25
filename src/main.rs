@@ -87,7 +87,7 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
     let dpos = Point::new(dx, dy);
 	game.player.dir = dpos;
 	game.player.pos += dpos;
-//	game.player.gold += collect_loot_at(game.map, game.player.pos);
+	game.player.gold += game.map.collect_loot_at(game.player.pos);
 
 	// Generate movement noises.
 
