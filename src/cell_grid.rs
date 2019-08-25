@@ -138,9 +138,6 @@ pub struct Player {
 
 	pub turns_remaining_underwater: usize,
 
-	pub seen: bool,
-
-	pub day: bool,
 	pub see_all: bool,
 	pub game_over: bool,
 }
@@ -254,9 +251,7 @@ pub fn make_player(pos: &Point) -> Player {
         damaged_last_turn: false,
         finished_level: false,
         turns_remaining_underwater: 0,
-        seen: false,
-        day: false,
-        see_all: false,
+        see_all: true, // false,
         game_over: false,
     }
 }

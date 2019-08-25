@@ -319,7 +319,7 @@ impl State for Game {
             {
                 let glyph = 208;
 
-                let lit = player.day || map.cells[[player.pos.x as usize, player.pos.y as usize]].lit;
+                let lit = map.cells[[player.pos.x as usize, player.pos.y as usize]].lit;
                 let noisy = player.noisy;
                 let damaged = player.damaged_last_turn;
                 let hidden = player.hidden(map);

@@ -89,7 +89,6 @@ fn act(&mut self, rng: &mut MyRng, player: &mut Player, map: &Map) {
 	// See if senses will kick us into a new mode
 
 	if self.sees_thief(map, player) {
-		player.seen = true;
 		self.goal = player.pos;
 
 		if self.mode == GuardMode::Patrol && !self.adjacent_to(player.pos) {
@@ -114,7 +113,6 @@ fn act(&mut self, rng: &mut MyRng, player: &mut Player, map: &Map) {
 
 		if self.heard_thief {
 			if self.adjacent_to(player.pos) {
-				player.seen = true;
 				self.mode = GuardMode::ChaseVisibleTarget;
 				self.goal = player.pos;
 			} else if self.mode == GuardMode::Patrol {
@@ -170,7 +168,6 @@ fn act(&mut self, rng: &mut MyRng, player: &mut Player, map: &Map) {
 
 	if self.pos != pos_prev {
 		if self.sees_thief(map, player) {
-			player.seen = true;
 			self.goal = player.pos;
 
 			if self.mode == GuardMode::Patrol && !self.adjacent_to(player.pos) {
@@ -316,7 +313,6 @@ fn patrol_step(&mut self, map: &Map, player: &mut Player, rng: &mut MyRng) {
 		self.mode = GuardMode::ChaseVisibleTarget;
 		self.goal = player.pos;
 		self.dir = update_dir(self.dir, self.goal - self.pos);
-		player.seen = true;
 	}
 }
 
