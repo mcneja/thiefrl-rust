@@ -17,6 +17,7 @@ use quicksilver::{
 
 struct Game {
     rng: MyRng,
+    level: usize,
     map: Map,
     player: Player,
     tileset: Asset<Vec<Image>>,
@@ -45,13 +46,21 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
 
     let pos_new = Point::new(player.pos.x + dx, player.pos.y + dy);
 
-/*
-	if !on_level(&map.cells, pos_new) && percent_map_seen(map) >= 100 && player.gold >= total_gold(map) {
-		s_level += 1;
-		init_level();
+	if !on_level(&game.map.cells, pos_new) && /* game.map.all_seen() && */ game.map.all_loot_collected() {
+		game.level += 1;
+        game.map = random_map::generate_map(&mut game.rng, game.level);
+
+        game.player.pos = game.map.pos_start;
+        game.player.dir = Point::new(0, 0);
+        game.player.gold = 0;
+        game.player.noisy = false;
+        game.player.damaged_last_turn = false;
+        game.player.finished_level = false;
+        game.player.turns_remaining_underwater = 0;
+        game.player.game_over = false;
+
 		return;
 	}
-*/
 
     if dx == 0 || dy == 0 {
 	    if blocked(&game.map, &player.pos, &pos_new) {
@@ -102,7 +111,7 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
 
 fn make_noise(map: &mut Map, player: &mut Player, _noise: &str) {
 	player.noisy = true;
-//	txt::noise(g_player.m_pos, noise);
+//	txt::noise(game.player.pos, noise);
 
     let guards = map.find_guards_in_earshot(player.pos, 75);
 
@@ -145,21 +154,21 @@ fn advance_time(game: &mut Game) {
 
 /*
 	map.recomputeVisibility(game.player.pos);
+*/
 
-	if percent_map_seen(game.map) >= 100 && game.player.gold >= total_gold(map) {
+	if game.map.all_seen() && game.map.all_loot_collected() {
 		game.player.finished_level = true;
 	}
-*/
 }
 
-fn on_level(map: &CellGrid, pos: &Point) -> bool {
+fn on_level(map: &CellGrid, pos: Point) -> bool {
     let size_x = map.extents()[0] as i32;
     let size_y = map.extents()[1] as i32;
 	pos.x >= 0 && pos.y >= 0 && pos.x < size_x && pos.y < size_y
 }
 
 fn blocked(map: &Map, pos_old: &Point, pos_new: &Point) -> bool {
-	if !on_level(&map.cells, pos_new) {
+	if !on_level(&map.cells, *pos_new) {
 		return true;
     }
 
@@ -223,13 +232,6 @@ impl State for Game {
     /// Load the assets and initialise the game
     fn new() -> Result<Self> {
         let tiles_file = "tiles.png";
-
-        let random_seed = rand::random::<u64>();
-
-        let mut rng = MyRng::seed_from_u64(random_seed);
-        let map = random_map::generate_map(&mut rng);
-        let player = make_player(&map.pos_start);
-
         let tile_size_px = Vector::new(16, 16);
 
         let tileset = Asset::new(Image::load(tiles_file).and_then(move |tiles| {
@@ -245,8 +247,15 @@ impl State for Game {
             Ok(tileset)
         }));
 
+        let random_seed = rand::random::<u64>();
+        let mut rng = MyRng::seed_from_u64(random_seed);
+        let level = 0;
+        let map = random_map::generate_map(&mut rng, level);
+        let player = make_player(&map.pos_start);
+
         Ok(Self {
             rng,
+            level: 0,
             map,
             player,
             tileset,

@@ -318,6 +318,27 @@ pub fn collect_loot_at(&mut self, pos: Point) -> usize {
 	gold
 }
 
+pub fn all_seen(&self) -> bool {
+    // There's got to be a better way to iterate over all the cells...
+    for x in 0..self.cells.extents()[0] {
+        for y in 0..self.cells.extents()[1] {
+            if !self.cells[[x, y]].seen {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn all_loot_collected(&self) -> bool {
+    for item in &self.items {
+        if item.kind == ItemKind::Coin {
+            return false;
+        }
+    }
+    true
+}
+
 pub fn random_neighbor_region(&self, rng: &mut MyRng, region: usize, region_exclude: usize) -> usize {
     let mut neighbors: Vec<usize> = Vec::with_capacity(8);
 

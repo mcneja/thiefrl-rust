@@ -40,12 +40,11 @@ struct Adjacency
     pub door: bool,
 }
 
-pub fn generate_map(rng: &mut MyRng) -> Map {
-    let level = 10;
-    generate_siheyuan(level, rng)
+pub fn generate_map(rng: &mut MyRng, level: usize) -> Map {
+    generate_siheyuan(rng, level)
 }
 
-fn generate_siheyuan(level: i32, rng: &mut MyRng) -> Map {
+fn generate_siheyuan(rng: &mut MyRng, level: usize) -> Map {
     let mut size_x: i32 = 0;
     for _ in 0..min(3, level) {
         size_x += rng.gen_range(0, 2);
@@ -460,7 +459,7 @@ fn neighboring_walls(map: &CellGrid, x: usize, y: usize) -> u32 {
 
 fn create_exits(
     rng: &mut MyRng,
-    level: i32,
+    level: usize,
     mirror_x: bool,
     mirror_y: bool,
     inside: &Array2D<bool>,
@@ -1308,7 +1307,7 @@ fn render_walls(rng: &mut MyRng, rooms: &[Room], adjacencies: &[Adjacency], map:
     }
 }
 
-fn render_rooms(level: i32, rooms: &[Room], map: &mut Map, rng: &mut MyRng) {
+fn render_rooms(level: usize, rooms: &[Room], map: &mut Map, rng: &mut MyRng) {
     for i_room in 1..rooms.len() {
         let room = &rooms[i_room];
 
@@ -1624,7 +1623,7 @@ fn place_front_pillars(map: &mut Map) {
     }
 }
 
-fn place_guards(rng: &mut MyRng, level: i32, rooms: &Vec<Room>, map: &mut Map) {
+fn place_guards(rng: &mut MyRng, level: usize, rooms: &Vec<Room>, map: &mut Map) {
     if level <= 0 {
         return;
     }
