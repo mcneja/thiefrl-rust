@@ -325,7 +325,7 @@ impl State for Game {
                 let hidden = player.hidden(map);
 
                 let color =
-                    if damaged {color_preset::LIGHT_RED}
+                    if damaged {Color {r: 1.0, g: 0.0, b: 0.0, a: 1.0}}
                     else if noisy {color_preset::LIGHT_CYAN}
                     else if hidden {Color {r: 0.0625, g: 0.0625, b: 0.0625, a: 0.875}}
                     else if lit {color_preset::LIGHT_GRAY}
