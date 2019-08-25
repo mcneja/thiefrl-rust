@@ -70,14 +70,18 @@ fn pos_next_best(map: &Map, distance_field: &Array2D<usize>, pos_from: Point) ->
 
 impl Guard {
 
-fn pre_turn(self: &mut Self) {
+fn pre_turn(&mut self) {
     self.heard_guard = self.hearing_guard;
     self.hearing_guard = false;
     self.speaking = false;
     self.has_moved = false;
 }
 
-fn act(self: &mut Self, rng: &mut MyRng, player: &mut Player, map: &Map) {
+pub fn hear_thief(&mut self) {
+	self.heard_thief = true;
+}
+
+fn act(&mut self, rng: &mut MyRng, player: &mut Player, map: &Map) {
 
 	let mode_prev = self.mode;
 	let pos_prev = self.pos;
@@ -229,20 +233,49 @@ fn act(self: &mut Self, rng: &mut MyRng, player: &mut Player, map: &Map) {
 	}
 }
 
-fn adjacent_to(self: &Self, pos: Point) -> bool {
+pub fn overhead_icon(&self, map: &Map, player: &Player) -> Option<usize> {
+	if self.mode == GuardMode::Patrol {
+		return None;
+	}
+
+	let cell = &map.cells[[self.pos.x as usize, self.pos.y as usize]];
+
+	let visible = player.see_all || cell.seen || self.speaking;
+	if !visible {
+		let dpos = player.pos - self.pos;
+		if dpos.length_squared() > 25 {
+			return None;
+		}
+	}
+
+	Some(if self.mode == GuardMode::ChaseVisibleTarget {216} else {215})
+}
+
+fn say(&mut self, player: &Player, msg: &str) {
+	let d = self.pos - player.pos;
+	let dist_squared = d.length_squared();
+
+	if dist_squared < 200 || player.see_all {
+//		txt::guard_speech(self.pos, msg);
+	}
+
+	self.speaking = true;
+}
+
+fn adjacent_to(&self, pos: Point) -> bool {
 	let d = pos - self.pos;
 	d.x.abs() < 2 && d.y.abs() < 2
 }
 
-fn sees_thief(self: &Self, map: &Map, player: &Player) -> bool {
+fn sees_thief(&self, map: &Map, player: &Player) -> bool {
 	let d = player.pos - self.pos;
-	if vector2d::Vector2D::dot(self.dir, d) < 0 {
+	if Point::dot(self.dir, d) < 0 {
 		return false;
     }
 
 	let player_is_lit = map.cells[[player.pos.x as usize, player.pos.y as usize]].lit;
 
-	let d2 = vector2d::Vector2D::dot(d, d);
+	let d2 = d.length_squared();
 	if d2 >= self.sight_cutoff(player_is_lit) {
 		return false;
     }
@@ -258,19 +291,19 @@ fn sees_thief(self: &Self, map: &Map, player: &Player) -> bool {
 	return false;
 }
 
-fn cutoff_lit(self: &Self) -> i32 {
+fn cutoff_lit(&self) -> i32 {
 	if self.mode == GuardMode::Patrol {40} else {75}
 }
 
-fn cutoff_unlit(self: &Self) -> i32 {
+fn cutoff_unlit(&self) -> i32 {
 	if self.mode == GuardMode::Patrol {3} else {33}
 }
 
-fn sight_cutoff(self: &Self, lit_target: bool) -> i32 {
+fn sight_cutoff(&self, lit_target: bool) -> i32 {
 	if lit_target {self.cutoff_lit()} else {self.cutoff_unlit()}
 }
 
-fn patrol_step(self: &mut Self, map: &Map, player: &mut Player, rng: &mut MyRng) {
+fn patrol_step(&mut self, map: &Map, player: &mut Player, rng: &mut MyRng) {
 	let bumped_thief = self.move_toward_region(map, player);
 
 	if map.cells[[self.pos.x as usize, self.pos.y as usize]].region == self.region_goal {
@@ -287,7 +320,7 @@ fn patrol_step(self: &mut Self, map: &Map, player: &mut Player, rng: &mut MyRng)
 	}
 }
 
-pub fn initial_dir(self: &Self, map: &Map) -> Point
+pub fn initial_dir(&self, map: &Map) -> Point
 {
 	if self.region_goal == INVALID_REGION {
 		return self.dir;
@@ -300,7 +333,7 @@ pub fn initial_dir(self: &Self, map: &Map) -> Point
 	update_dir(self.dir, pos_next - self.pos)
 }
 
-fn move_toward_region(self: &mut Self, map: &Map, player: &Player) -> bool {
+fn move_toward_region(&mut self, map: &Map, player: &Player) -> bool {
 	if self.region_goal == INVALID_REGION {
 		return false;
 	}
@@ -319,7 +352,7 @@ fn move_toward_region(self: &mut Self, map: &Map, player: &Player) -> bool {
 	false
 }
 
-fn move_toward_goal(self: &mut Self, map: &Map, player: &Player) -> bool {
+fn move_toward_goal(&mut self, map: &Map, player: &Player) -> bool {
 	let dist_field = map.compute_distances_to_position(self.goal);
 
 	let pos_next = pos_next_best(map, &dist_field, self.pos);
@@ -337,7 +370,7 @@ fn move_toward_goal(self: &mut Self, map: &Map, player: &Player) -> bool {
 	true
 }
 
-pub fn setup_goal_region(self: &mut Self, rng: &mut MyRng, map: &Map) {
+pub fn setup_goal_region(&mut self, rng: &mut MyRng, map: &Map) {
 	let region_cur = map.cells[[self.pos.x as usize, self.pos.y as usize]].region;
 
 	if self.region_goal != INVALID_REGION && region_cur == self.region_prev {
@@ -357,8 +390,8 @@ pub fn setup_goal_region(self: &mut Self, rng: &mut MyRng, map: &Map) {
 fn update_dir(dir_forward: Point, dir_aim: Point) -> Point {
 	let dir_left = Point::new(-dir_forward.y, dir_forward.x);
 
-	let dot_forward = vector2d::Vector2D::dot(dir_forward, dir_aim);
-	let dot_left = vector2d::Vector2D::dot(dir_left, dir_aim);
+	let dot_forward = Point::dot(dir_forward, dir_aim);
+	let dot_left = Point::dot(dir_left, dir_aim);
 
 	if dot_forward.abs() > dot_left.abs() {
 		if dot_forward >= 0 {dir_forward} else {-dir_forward}

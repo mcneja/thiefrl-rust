@@ -94,12 +94,21 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
 	let cell_type = game.map.cells[[game.player.pos.x as usize, game.player.pos.y as usize]].cell_type;
 
 	if cell_type == CellType::GroundWoodCreaky {
-//		make_noise(map, "\xae" "creak\xaf");
-	} else if cell_type == CellType::GroundGravel {
-//		make_noise(map, "\xae" "crunch\xaf");
+		make_noise(&mut game.map, &mut game.player, "\u{AE}creak\u{AF}");
 	}
 
     advance_time(game);
+}
+
+fn make_noise(map: &mut Map, player: &mut Player, _noise: &str) {
+	player.noisy = true;
+//	txt::noise(g_player.m_pos, noise);
+
+    let guards = map.find_guards_in_earshot(player.pos, 75);
+
+    for guard in guards {
+		guard.hear_thief();
+	}
 }
 
 fn halts_slide(map: &Map, pos: &Point) -> bool {
@@ -309,7 +318,19 @@ impl State for Game {
             }
             {
                 let glyph = 208;
-                let color = color_preset::LIGHT_CYAN;
+
+                let lit = player.day || map.cells[[player.pos.x as usize, player.pos.y as usize]].lit;
+                let noisy = player.noisy;
+                let damaged = player.damaged_last_turn;
+                let hidden = player.hidden(map);
+
+                let color =
+                    if damaged {color_preset::LIGHT_RED}
+                    else if noisy {color_preset::LIGHT_CYAN}
+                    else if hidden {Color {r: 0.0625, g: 0.0625, b: 0.0625, a: 0.875}}
+                    else if lit {color_preset::LIGHT_GRAY}
+                    else {color_preset::LIGHT_BLUE};
+
                 let image = &tileset[glyph];
                 let pos = Vector::new(player.pos.x, (map_size_y - 1) as i32 - player.pos.y);
                 let pos_px = offset_px + pos.times(tile_size_px);
@@ -334,6 +355,18 @@ impl State for Game {
                     &Rectangle::new(pos_px, image.area().size()),
                     Blended(&image, color)
                 );
+            }
+            for guard in guards {
+                if let Some(glyph) = guard.overhead_icon(map, player) {
+                    let image = &tileset[glyph];
+                    let pos = Vector::new(guard.pos.x, (map_size_y - 1) as i32 - guard.pos.y);
+                    let pos_px = offset_px + pos.times(tile_size_px) - Vector::new(0, 10);
+                    let color = color_preset::LIGHT_YELLOW;
+                    window.draw(
+                        &Rectangle::new(pos_px, image.area().size()),
+                        Blended(&image, color)
+                    );
+                }
             }
 
 /*

@@ -3,14 +3,13 @@ use multiarray::Array2D;
 use rand::Rng;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::collections::VecDeque;
 
 pub type MyRng = rand_pcg::Pcg32;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[allow(dead_code)]
 pub enum CellType {
     GroundNormal,
-    GroundGravel,
     GroundGrass,
     GroundWater,
     GroundMarble,
@@ -54,6 +53,7 @@ pub struct Cell {
     pub move_cost: usize,
     pub region: usize,
     pub blocks_sight: bool,
+    pub blocks_sound: bool,
     pub hides_player: bool,
     pub lit: bool,
     pub seen: bool,
@@ -159,12 +159,11 @@ pub struct Tile {
 pub fn tile_def(tile_type: CellType) -> &'static Tile {
     match tile_type {
         CellType::GroundNormal     => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
-        CellType::GroundGravel     => &Tile { glyph: 130, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
         CellType::GroundGrass      => &Tile { glyph: 132, color: color_preset::DARK_GREEN, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
         CellType::GroundWater      => &Tile { glyph: 134, color: color_preset::LIGHT_BLUE, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
         CellType::GroundMarble     => &Tile { glyph: 136, color: color_preset::DARK_CYAN, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
         CellType::GroundWood       => &Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
-        CellType::GroundWoodCreaky => &Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
+        CellType::GroundWoodCreaky => &Tile { glyph: 138, color: color_preset::DARK_GRAY, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
 
                   //  NSEW
         CellType::Wall0000 => &Tile { glyph: 176, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
@@ -198,7 +197,6 @@ pub fn tile_def(tile_type: CellType) -> &'static Tile {
 pub fn guard_move_cost_for_tile_type(tile_type: CellType) -> usize {
     match tile_type {
         CellType::GroundNormal     => 0,
-        CellType::GroundGravel     => 2,
         CellType::GroundGrass      => 0,
         CellType::GroundWater      => 4096,
         CellType::GroundMarble     => 0,
@@ -264,7 +262,7 @@ pub fn make_player(pos: &Point) -> Player {
 }
 
 impl Player {
-    pub fn apply_damage(self: &mut Self, d: usize) {
+    pub fn apply_damage(&mut self, d: usize) {
         if d >= self.health {
             self.health = 0;
             self.game_over = true;
@@ -278,7 +276,13 @@ impl Player {
         }
     }
 
-    pub fn hidden(self: &Self, map: &Map) -> bool {
+    pub fn hidden(&self, map: &Map) -> bool {
+        for guard in &map.guards {
+            if guard.mode == GuardMode::ChaseVisibleTarget {
+                return false;
+            }
+        }
+
         if map.hides_player(self.pos.x, self.pos.y) {
             return true;
         }
@@ -304,15 +308,22 @@ const ADJACENT_MOVES: [(usize, Point); 8] = [
     (3, Point { x: 1, y: 1 }),
 ];
 
+const SOUND_NEIGHBORS: [Point; 4] = [
+	Point { x: -1, y:  0 },
+	Point { x:  1, y:  0 },
+	Point { x:  0, y: -1 },
+	Point { x:  0, y:  1 },
+];
+
 impl Map {
 
-pub fn collect_loot_at(self: &mut Self, pos: Point) -> usize {
+pub fn collect_loot_at(&mut self, pos: Point) -> usize {
 	let mut gold = 0;
     self.items.retain(|item| if item.kind == ItemKind::Coin && item.pos == pos {gold += 1; false} else {true});
 	gold
 }
 
-pub fn random_neighbor_region(self: &Self, rng: &mut MyRng, region: usize, region_exclude: usize) -> usize {
+pub fn random_neighbor_region(&self, rng: &mut MyRng, region: usize, region_exclude: usize) -> usize {
     let mut neighbors: Vec<usize> = Vec::with_capacity(8);
 
 	for (region0, region1) in &self.patrol_routes {
@@ -330,11 +341,11 @@ pub fn random_neighbor_region(self: &Self, rng: &mut MyRng, region: usize, regio
 	return neighbors[rng.gen_range(0, neighbors.len())];
 }
 
-fn guard_cell_cost(self: &Self, x: usize, y: usize) -> usize {
+fn guard_cell_cost(&self, x: usize, y: usize) -> usize {
     self.cells[[x, y]].move_cost
 }
 
-pub fn guard_move_cost(self: &Self, pos_old: Point, pos_new: Point) -> usize {
+pub fn guard_move_cost(&self, pos_old: Point, pos_new: Point) -> usize {
 	let cost = self.guard_cell_cost(pos_new.x as usize, pos_new.y as usize);
 
 	if cost == INFINITE_COST {
@@ -353,7 +364,7 @@ pub fn guard_move_cost(self: &Self, pos_old: Point, pos_new: Point) -> usize {
 	cost
 }
 
-pub fn pos_blocked_by_guard(self: &Self, pos: Point) -> bool {
+pub fn pos_blocked_by_guard(&self, pos: Point) -> bool {
 	for guard in &self.guards {
 		if guard.pos == pos {
 			return true;
@@ -363,7 +374,7 @@ pub fn pos_blocked_by_guard(self: &Self, pos: Point) -> bool {
 	false
 }
 
-pub fn closest_region(self: &Self, pos: &Point) -> usize {
+pub fn closest_region(&self, pos: &Point) -> usize {
 
     #[derive(Copy, Clone, Eq, PartialEq)]
     struct State {
@@ -426,7 +437,7 @@ pub fn closest_region(self: &Self, pos: &Point) -> usize {
     INVALID_REGION
 }
 
-pub fn compute_distances_to_region(self: &Self, i_region_goal: usize) -> Array2D<usize> {
+pub fn compute_distances_to_region(&self, i_region_goal: usize) -> Array2D<usize> {
 	assert!(i_region_goal < self.patrol_regions.len());
 
     let region = &self.patrol_regions[i_region_goal];
@@ -445,7 +456,7 @@ pub fn compute_distances_to_region(self: &Self, i_region_goal: usize) -> Array2D
     self.compute_distance_field(&goal)
 }
 
-pub fn compute_distances_to_position(self: &Self, pos_goal: Point) -> Array2D<usize> {
+pub fn compute_distances_to_position(&self, pos_goal: Point) -> Array2D<usize> {
 	assert!(pos_goal.x >= 0);
 	assert!(pos_goal.y >= 0);
 	assert!(pos_goal.x < self.cells.extents()[0] as i32);
@@ -454,7 +465,7 @@ pub fn compute_distances_to_position(self: &Self, pos_goal: Point) -> Array2D<us
     self.compute_distance_field(&[(0, pos_goal)])
 }
 
-pub fn compute_distance_field(self: &Self, initial_distances: &[(usize, Point)]) -> Array2D<usize> {
+pub fn compute_distance_field(&self, initial_distances: &[(usize, Point)]) -> Array2D<usize> {
 
     #[derive(Copy, Clone, Eq, PartialEq)]
     struct State {
@@ -514,12 +525,70 @@ pub fn compute_distance_field(self: &Self, initial_distances: &[(usize, Point)])
     dist_field
 }
 
-pub fn blocks_sight(self: &Self, x: i32, y: i32) -> bool {
+pub fn blocks_sight(&self, x: i32, y: i32) -> bool {
     self.cells[[x as usize, y as usize]].blocks_sight
 }
 
-pub fn hides_player(self: &Self, x: i32, y: i32) -> bool {
+pub fn hides_player(&self, x: i32, y: i32) -> bool {
     self.cells[[x as usize, y as usize]].hides_player
+}
+
+pub fn find_guards_in_earshot(&mut self, emitter_pos: Point, radius: i32) -> Vec<&mut Guard> {
+    let mut visited: Array2D<bool> = Array2D::new([self.cells.extents()[0], self.cells.extents()[1]], false);
+
+	// Flood-fill from the emitter position.
+
+	let mut points: VecDeque<Point> = VecDeque::new();
+	points.push_back(emitter_pos);
+	visited[[emitter_pos.x as usize, emitter_pos.y as usize]] = true;
+
+	while let Some(pos) = points.pop_front() {
+        for dir in &SOUND_NEIGHBORS {
+			let new_pos = pos + *dir;
+
+			// Skip positions that are off the map.
+
+			if new_pos.x < 0 || new_pos.x >= self.cells.extents()[0] as i32 ||
+				new_pos.y < 0 || new_pos.y >= self.cells.extents()[1] as i32 {
+				continue;
+            }
+
+			// Skip neighbors that have already been visited.
+
+			if visited[[new_pos.x as usize, new_pos.y as usize]] {
+				continue;
+            }
+
+			// Skip neighbors that are outside of the hearing radius.
+
+			let d = new_pos - emitter_pos;
+			let d2 = d.length_squared();
+			if d2 >= radius {
+				continue;
+            }
+
+			// Skip neighbors that don't transmit sound
+
+			if self.cells[[new_pos.x as usize, new_pos.y as usize]].blocks_sound {
+				continue;
+            }
+
+            visited[[new_pos.x as usize, new_pos.y as usize]] = true;
+			points.push_back(new_pos);
+		}
+	}
+
+	// Return guards that are on marked squares.
+
+    let mut guards = Vec::with_capacity(self.guards.len());
+
+    for guard in &mut self.guards {
+		if visited[[guard.pos.x as usize, guard.pos.y as usize]] {
+			guards.push(guard);
+        }
+	}
+
+    guards
 }
 
 }

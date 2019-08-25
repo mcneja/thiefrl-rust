@@ -296,6 +296,7 @@ fn plot_walls(inside: &Array2D<bool>, offset_x: &Array2D<i32>, offset_y: &Array2
         move_cost: 0,
         region: INVALID_REGION,
         blocks_sight: false,
+        blocks_sound: false,
         hides_player: false,
         lit: false,
         seen: false,
@@ -401,7 +402,6 @@ fn wall_type_from_neighbors(neighbors: u32) -> CellType {
 fn is_wall(cell_type: CellType) -> bool {
     match cell_type {
         CellType::GroundNormal     => false,
-        CellType::GroundGravel     => false,
         CellType::GroundGrass      => false,
         CellType::GroundWater      => false,
         CellType::GroundMarble     => false,
@@ -1741,6 +1741,7 @@ fn cache_cell_info(map: &mut Map) {
             let tile = tile_def(cell_type);
             cell.move_cost = guard_move_cost_for_tile_type(cell_type);
             cell.blocks_sight = tile.blocks_sight;
+            cell.blocks_sound = tile.blocks_sound;
             cell.hides_player = tile.hides_player;
         }
     }
@@ -1749,8 +1750,12 @@ fn cache_cell_info(map: &mut Map) {
         let cell = &mut map.cells[[item.pos.x as usize, item.pos.y as usize]];
         let kind = item.kind;
         cell.move_cost = max(cell.move_cost, guard_move_cost_for_item_kind(kind));
-        cell.blocks_sight = kind == ItemKind::DoorNS || kind == ItemKind::DoorEW || kind == ItemKind::Bush;
-        cell.hides_player = kind == ItemKind::Table || kind == ItemKind::Bush;
+        if kind == ItemKind::DoorNS || kind == ItemKind::DoorEW || kind == ItemKind::Bush {
+            cell.blocks_sight = true;
+        }
+        if kind == ItemKind::Table || kind == ItemKind::Bush {
+            cell.hides_player = true;
+        }
     }
 }
 
