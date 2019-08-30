@@ -19,6 +19,7 @@ struct Game {
     rng: MyRng,
     level: usize,
     map: Map,
+    lines: Lines,
     player: Player,
     tileset: Asset<Vec<Image>>,
     tile_size_px: Vector,
@@ -150,7 +151,7 @@ fn advance_time(game: &mut Game) {
 		game.player.turns_remaining_underwater = 7;
 	}
 
-	guard_act_all(&mut game.rng, &mut game.map, &mut game.player);
+	guard_act_all(&mut game.rng, &mut game.lines, &mut game.map, &mut game.player);
 
 /*
 	map.recomputeVisibility(game.player.pos);
@@ -252,10 +253,12 @@ impl State for Game {
         let level = 0;
         let map = random_map::generate_map(&mut rng, level);
         let player = make_player(&map.pos_start);
+        let lines = new_lines();
 
         Ok(Self {
             rng,
             level: 0,
+            lines,
             map,
             player,
             tileset,

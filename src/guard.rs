@@ -13,7 +13,7 @@ pub fn is_guard_at(map: &Map, x: i32, y: i32) -> bool {
     return false;
 }
 
-pub fn guard_act_all(rng: &mut MyRng, map: &mut Map, player: &mut Player) {
+pub fn guard_act_all(rng: &mut MyRng, lines: &mut Lines, map: &mut Map, player: &mut Player) {
 
 	// Mark if we heard a guard last turn, and clear the speaking flag.
 
@@ -26,7 +26,7 @@ pub fn guard_act_all(rng: &mut MyRng, map: &mut Map, player: &mut Player) {
     let mut guards = map.guards.split_off(0);
 
     for mut guard in guards.drain(..) {
-		guard.act(rng, player, map);
+		guard.act(rng, lines, player, map);
         map.guards.push(guard);
 	}
 }
@@ -68,6 +68,51 @@ fn pos_next_best(map: &Map, distance_field: &Array2D<usize>, pos_from: Point) ->
 	pos_best
 }
 
+struct LineIter {
+	lines: &'static [&'static str],
+	line_index: usize,
+}
+
+impl LineIter {
+	fn new(lines: &'static [&'static str]) -> LineIter {
+		LineIter { lines, line_index: 0 }
+	}
+
+	fn next(&mut self) -> &'static str {
+		let s = self.lines[self.line_index];
+		self.line_index = (self.line_index + 1) % self.lines.len();
+		s
+	}
+}
+
+pub struct Lines {
+	see: LineIter,
+	hear: LineIter,
+	hear_guard: LineIter,
+	chase: LineIter,
+	investigate: LineIter,
+	end_chase: LineIter,
+	end_investigate: LineIter,
+	done_looking: LineIter,
+	done_listening: LineIter,
+	damage: LineIter,
+}
+
+pub fn new_lines() -> Lines {
+	Lines {
+		see: LineIter::new(SEE_LINES),
+		hear: LineIter::new(HEAR_LINES),
+		hear_guard: LineIter::new(HEAR_GUARD_LINES),
+		chase: LineIter::new(CHASE_LINES),
+		investigate: LineIter::new(INVESTIGATE_LINES),
+		end_chase: LineIter::new(END_CHASE_LINES),
+		end_investigate: LineIter::new(END_INVESTIGATION_LINES),
+		done_looking: LineIter::new(DONE_LOOKING_LINES),
+		done_listening: LineIter::new(DONE_LISTENING_LINES),
+		damage: LineIter::new(DAMAGE_LINES),
+	}
+}
+
 impl Guard {
 
 fn pre_turn(&mut self) {
@@ -81,7 +126,7 @@ pub fn hear_thief(&mut self) {
 	self.heard_thief = true;
 }
 
-fn act(&mut self, rng: &mut MyRng, player: &mut Player, map: &Map) {
+fn act(&mut self, rng: &mut MyRng, lines: &mut Lines, player: &mut Player, map: &Map) {
 
 	let mode_prev = self.mode;
 	let pos_prev = self.pos;
@@ -195,36 +240,36 @@ fn act(&mut self, rng: &mut MyRng, player: &mut Player, map: &Map) {
 		match self.mode {
 			GuardMode::Patrol => {
 				if mode_prev == GuardMode::Look {
-//					say(done_looking_lines.pop_msg());
+					self.say(player, lines.done_looking.next());
 				} else if mode_prev == GuardMode::Listen {
-//					say(done_listening_lines.pop_msg());
+					self.say(player, lines.done_listening.next());
 				}
 				else if mode_prev == GuardMode::MoveToLastSound || mode_prev == GuardMode::MoveToGuardShout {
-//					say(end_investigation_lines.pop_msg());
+					self.say(player, lines.end_investigate.next());
 				}
 				else if mode_prev == GuardMode::MoveToLastSighting {
-//					say(end_search_lines.pop_msg());
+					self.say(player, lines.end_chase.next());
 				}
 			},
 			GuardMode::Look => {
-//				say(see_lines.pop_msg());
+				self.say(player, lines.see.next());
 			},
 			GuardMode::Listen => {
-//				say(hear_lines.pop_msg());
+				self.say(player, lines.hear.next());
 			},
 			GuardMode::ChaseVisibleTarget => {
 				if mode_prev != GuardMode::MoveToLastSighting {
-//					alert_nearby_guards(map);
-//					say(chase_lines.pop_msg());
+//					self.alert_nearby_guards(map);
+					self.say(player, lines.chase.next());
 				}
 			},
 			GuardMode::MoveToLastSighting => {
 			},
 			GuardMode::MoveToLastSound => {
-//				say(investigate_lines.pop_msg());
+				self.say(player, lines.investigate.next());
 			},
 			GuardMode::MoveToGuardShout => {
-//				say(hear_guard_lines.pop_msg());
+				self.say(player, lines.hear_guard.next());
 			},
 		}
 	}
@@ -253,6 +298,7 @@ fn say(&mut self, player: &Player, msg: &str) {
 	let dist_squared = d.length_squared();
 
 	if dist_squared < 200 || player.see_all {
+		println!("{}", msg);
 //		txt::guard_speech(self.pos, msg);
 	}
 
@@ -438,3 +484,126 @@ fn line_of_sight(map: &Map, from: Point, to: Point) -> bool {
 
 	true
 }
+
+static SEE_LINES: &[&str] = &[
+	"Who goes there?",
+	"Huh?",
+	"What?",
+	"Wait...",
+	"Who's that?",
+	"Hey...",
+	"Hmm...",
+	"What moved?",
+	"Did that shadow move?",
+	"I see something...",
+	"Hello?",
+];
+
+static HEAR_LINES: &[&str] = &[
+	"Huh?",
+	"What?",
+	"Hark!",
+	"A noise...",
+	"I heard something.",
+	"Hmm...",
+	"Who goes there?",
+	"What's that noise?",
+	"I hear something...",
+	"Hello?",
+];
+
+static HEAR_GUARD_LINES: &[&str] = &[
+	"Where?",
+	"I'm coming!",
+	"Here I come!",
+	"To arms!",
+	"Where is he?",
+];
+
+static CHASE_LINES: &[&str] = &[
+	"Halt!",
+	"Hey!",
+	"Aha!",
+	"I see you!",
+	"I'm coming!",
+	"I'll get you!",
+	"Just you wait...",
+	"You won't get away!",
+	"Oh no you don't...",
+	"Get him!",
+	"After him!",
+	"Thief!",
+];
+
+static INVESTIGATE_LINES: &[&str] = &[
+	"That noise again...",
+	"I heard it again!",
+	"Someone's there!",
+	"Who could that be?",
+	"There it is again!",
+	"What was that?",
+	"Better check it out...",
+	"What keeps making those noises?",
+	"That better be rats!",
+	"Again?",
+];
+
+static END_CHASE_LINES: &[&str] = &[
+	"(huff, huff)",
+	"Where did he go?",
+	"Lost him!",
+	"Gone!",
+	"Come back!",
+	"Argh!",
+	"He's not coming back.",
+	"Blast!",
+	"Next time!",
+];
+
+static END_INVESTIGATION_LINES: &[&str] = &[
+	"Guess it was nothing.",
+	"Wonder what it was?",
+	"Better get back.",
+	"It's quiet now.",
+	"This is where I heard it...",
+	"Nothing, now.",
+];
+
+static DONE_LOOKING_LINES: &[&str] = &[
+	"Must have been rats.",
+	"Too much coffee!",
+	"I've got the jitters.",
+	"Probably nothing.",
+	"I thought I saw something.",
+	"Oh well.",
+	"Nothing.",
+	"Can't see it now.",
+	"I've been up too long.",
+	"Seeing things, I guess.",
+	"Hope it wasn't anything.",
+	"Did I imagine that?",
+];
+
+static DONE_LISTENING_LINES: &[&str] = &[
+	"Must have been rats.",
+	"Too much coffee!",
+	"I've got the jitters.",
+	"Probably nothing.",
+	"I thought I heard something.",
+	"Oh well.",
+	"Nothing.",
+	"Can't hear it now.",
+	"I've been up too long.",
+	"Hearing things, I guess.",
+	"Hope it wasn't anything.",
+	"Did I imagine that?",
+];
+
+static DAMAGE_LINES: &[&str] = &[
+	"Oof!",
+	"Krak!",
+	"Pow!",
+	"Urk!",
+	"Smack!",
+	"Bif!",
+];
