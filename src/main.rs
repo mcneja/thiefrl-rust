@@ -316,6 +316,7 @@ impl State for Game {
         let items = &self.map.items;
         let guards = &self.map.guards;
         let player = &self.player;
+        let font_image = &self.font_image;
 
         self.tileset.execute(|tileset| {
             for x in 0..map_size_x {
@@ -458,12 +459,12 @@ impl State for Game {
             }
 */
 
+            put_glyph(window, font_image, 16, 192, 65);
+            put_glyph(window, font_image, 32, 192, 66);
+            put_glyph(window, font_image, 48, 192, 67);
+
             Ok(())
         })?;
-
-        put_glyph(window, &self.font_image, 16, 256, 65);
-        put_glyph(window, &self.font_image, 32, 256, 66);
-        put_glyph(window, &self.font_image, 48, 256, 67);
 
         Ok(())
     }
