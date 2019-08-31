@@ -1,7 +1,9 @@
 mod cell_grid;
 mod color_preset;
+mod fontdata;
 mod guard;
 mod random_map;
+
 use rand::prelude::*;
 
 use crate::cell_grid::*;
@@ -9,7 +11,7 @@ use crate::guard::*;
 
 use quicksilver::{
     geom::{Rectangle, Vector},
-    graphics::{Background::{Blended}, Color, Image},
+    graphics::{Background::{Blended, Img}, Color, Image},
     input::Key,
     lifecycle::{run, Asset, Event, Settings, State, Window},
     Future, Result,
@@ -23,6 +25,7 @@ struct Game {
     player: Player,
     tileset: Asset<Vec<Image>>,
     tile_size_px: Vector,
+    font_image: Image,
 }
 
 fn main() {
@@ -229,6 +232,15 @@ fn color_for_item(kind: ItemKind) -> Color {
     }
 }
 
+fn put_glyph(window: &mut Window, font_image: &Image, x: i32, y: i32, glyph_id: usize) {
+    if let Some(glyph) = crate::fontdata::GLYPH.iter().find(|&glyph| glyph.id == glyph_id) {
+        window.draw(
+            &Rectangle::new((x + glyph.x_offset, y + glyph.y_offset + crate::fontdata::BASE), (glyph.width, glyph.height)),
+            Img(&font_image.subimage(Rectangle::new((glyph.x, glyph.y), (glyph.width, glyph.height))))
+        );
+    }
+}
+
 impl State for Game {
     /// Load the assets and initialise the game
     fn new() -> Result<Self> {
@@ -236,7 +248,7 @@ impl State for Game {
         let tile_size_px = Vector::new(16, 16);
 
         let tileset = Asset::new(Image::load(tiles_file).and_then(move |tiles| {
-            let mut tileset = Vec::new();
+            let mut tileset = Vec::with_capacity(256);
             for y in 0..16 {
                 for x in 0..16 {
                     let pos_px = tile_size_px.times(Vector::new(x, 15 - y));
@@ -247,6 +259,8 @@ impl State for Game {
             }
             Ok(tileset)
         }));
+
+        let font_image = Image::from_bytes(&crate::fontdata::BITMAP_DATA).unwrap();
 
         let random_seed = rand::random::<u64>();
         let mut rng = MyRng::seed_from_u64(random_seed);
@@ -263,6 +277,7 @@ impl State for Game {
             player,
             tileset,
             tile_size_px,
+            font_image
        })
     }
 
@@ -301,6 +316,7 @@ impl State for Game {
         let items = &self.map.items;
         let guards = &self.map.guards;
         let player = &self.player;
+
         self.tileset.execute(|tileset| {
             for x in 0..map_size_x {
                 for y in 0..map_size_y {
@@ -444,6 +460,10 @@ impl State for Game {
 
             Ok(())
         })?;
+
+        put_glyph(window, &self.font_image, 16, 256, 65);
+        put_glyph(window, &self.font_image, 32, 256, 66);
+        put_glyph(window, &self.font_image, 48, 256, 67);
 
         Ok(())
     }
