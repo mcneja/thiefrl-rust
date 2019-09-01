@@ -95,7 +95,7 @@ pub struct Lines {
 	end_investigate: LineIter,
 	done_looking: LineIter,
 	done_listening: LineIter,
-	damage: LineIter,
+//	damage: LineIter,
 }
 
 pub fn new_lines() -> Lines {
@@ -109,7 +109,7 @@ pub fn new_lines() -> Lines {
 		end_investigate: LineIter::new(END_INVESTIGATION_LINES),
 		done_looking: LineIter::new(DONE_LOOKING_LINES),
 		done_listening: LineIter::new(DONE_LISTENING_LINES),
-		damage: LineIter::new(DAMAGE_LINES),
+//		damage: LineIter::new(DAMAGE_LINES),
 	}
 }
 
@@ -599,6 +599,7 @@ static DONE_LISTENING_LINES: &[&str] = &[
 	"Did I imagine that?",
 ];
 
+/*
 static DAMAGE_LINES: &[&str] = &[
 	"Oof!",
 	"Krak!",
@@ -607,3 +608,4 @@ static DAMAGE_LINES: &[&str] = &[
 	"Smack!",
 	"Bif!",
 ];
+*/
