@@ -89,22 +89,22 @@ pub enum GuardMode
 }
 
 pub struct Guard {
-	pub pos: Point,
-	pub dir: Point,
-	pub mode: GuardMode,
-	pub speaking: bool,
-	pub has_moved: bool,
-	pub heard_thief: bool,
-	pub hearing_guard: bool,
-	pub heard_guard: bool,
-	pub heard_guard_pos: Point,
+    pub pos: Point,
+    pub dir: Point,
+    pub mode: GuardMode,
+    pub speaking: bool,
+    pub has_moved: bool,
+    pub heard_thief: bool,
+    pub hearing_guard: bool,
+    pub heard_guard: bool,
+    pub heard_guard_pos: Point,
 
-	// Chase
-	pub goal: Point,
-	pub mode_timeout: usize,
+    // Chase
+    pub goal: Point,
+    pub mode_timeout: usize,
 
-	// Patrol
-	pub region_goal: usize,
+    // Patrol
+    pub region_goal: usize,
     pub region_prev: usize,
 }
 
@@ -128,18 +128,18 @@ pub enum ItemKind {
 pub struct Player {
     pub pos: Point,
     pub dir: Point,
-	pub max_health: usize,
-	pub health: usize,
-	pub gold: usize,
+    pub max_health: usize,
+    pub health: usize,
+    pub gold: usize,
 
-	pub noisy: bool, // did the player make noise last turn?
-	pub damaged_last_turn: bool,
-	pub finished_level: bool,
+    pub noisy: bool, // did the player make noise last turn?
+    pub damaged_last_turn: bool,
+    pub finished_level: bool,
 
-	pub turns_remaining_underwater: usize,
+    pub turns_remaining_underwater: usize,
 
-	pub see_all: bool,
-	pub game_over: bool,
+    pub see_all: bool,
+    pub game_over: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -304,18 +304,18 @@ const ADJACENT_MOVES: [(usize, Point); 8] = [
 ];
 
 const SOUND_NEIGHBORS: [Point; 4] = [
-	Point { x: -1, y:  0 },
-	Point { x:  1, y:  0 },
-	Point { x:  0, y: -1 },
-	Point { x:  0, y:  1 },
+    Point { x: -1, y:  0 },
+    Point { x:  1, y:  0 },
+    Point { x:  0, y: -1 },
+    Point { x:  0, y:  1 },
 ];
 
 impl Map {
 
 pub fn collect_loot_at(&mut self, pos: Point) -> usize {
-	let mut gold = 0;
+    let mut gold = 0;
     self.items.retain(|item| if item.kind == ItemKind::Coin && item.pos == pos {gold += 1; false} else {true});
-	gold
+    gold
 }
 
 pub fn all_seen(&self) -> bool {
@@ -342,19 +342,19 @@ pub fn all_loot_collected(&self) -> bool {
 pub fn random_neighbor_region(&self, rng: &mut MyRng, region: usize, region_exclude: usize) -> usize {
     let mut neighbors: Vec<usize> = Vec::with_capacity(8);
 
-	for (region0, region1) in &self.patrol_routes {
-		if *region0 == region && *region1 != region_exclude {
-			neighbors.push(*region1);
+    for (region0, region1) in &self.patrol_routes {
+        if *region0 == region && *region1 != region_exclude {
+            neighbors.push(*region1);
         } else if *region1 == region && *region0 != region_exclude {
-			neighbors.push(*region0);
+            neighbors.push(*region0);
         }
-	}
-
-	if neighbors.is_empty() {
-		return region;
     }
 
-	return neighbors[rng.gen_range(0, neighbors.len())];
+    if neighbors.is_empty() {
+        return region;
+    }
+
+    return neighbors[rng.gen_range(0, neighbors.len())];
 }
 
 fn guard_cell_cost(&self, x: usize, y: usize) -> usize {
@@ -362,32 +362,32 @@ fn guard_cell_cost(&self, x: usize, y: usize) -> usize {
 }
 
 pub fn guard_move_cost(&self, pos_old: Point, pos_new: Point) -> usize {
-	let cost = self.guard_cell_cost(pos_new.x as usize, pos_new.y as usize);
+    let cost = self.guard_cell_cost(pos_new.x as usize, pos_new.y as usize);
 
-	if cost == INFINITE_COST {
-		return cost;
+    if cost == INFINITE_COST {
+        return cost;
     }
 
     // Guards are not allowed to move diagonally around corners.
 
-	if pos_old.x != pos_new.x &&
+    if pos_old.x != pos_new.x &&
         pos_old.y != pos_new.y &&
-		(self.guard_cell_cost(pos_old.x as usize, pos_new.y as usize) == INFINITE_COST ||
-		self.guard_cell_cost(pos_new.x as usize, pos_old.y as usize) == INFINITE_COST) {
-		return INFINITE_COST;
-	}
+        (self.guard_cell_cost(pos_old.x as usize, pos_new.y as usize) == INFINITE_COST ||
+        self.guard_cell_cost(pos_new.x as usize, pos_old.y as usize) == INFINITE_COST) {
+        return INFINITE_COST;
+    }
 
-	cost
+    cost
 }
 
 pub fn pos_blocked_by_guard(&self, pos: Point) -> bool {
-	for guard in &self.guards {
-		if guard.pos == pos {
-			return true;
-		}
-	}
+    for guard in &self.guards {
+        if guard.pos == pos {
+            return true;
+        }
+    }
 
-	false
+    false
 }
 
 pub fn closest_region(&self, pos: &Point) -> usize {
@@ -454,11 +454,11 @@ pub fn closest_region(&self, pos: &Point) -> usize {
 }
 
 pub fn compute_distances_to_region(&self, i_region_goal: usize) -> Array2D<usize> {
-	assert!(i_region_goal < self.patrol_regions.len());
+    assert!(i_region_goal < self.patrol_regions.len());
 
     let region = &self.patrol_regions[i_region_goal];
 
-	// Fill the priority queue with all of the region's locations.
+    // Fill the priority queue with all of the region's locations.
 
     let mut goal = Vec::with_capacity(((region.pos_max.x - region.pos_min.x) * (region.pos_max.y - region.pos_min.y)) as usize);
 
@@ -473,10 +473,10 @@ pub fn compute_distances_to_region(&self, i_region_goal: usize) -> Array2D<usize
 }
 
 pub fn compute_distances_to_position(&self, pos_goal: Point) -> Array2D<usize> {
-	assert!(pos_goal.x >= 0);
-	assert!(pos_goal.y >= 0);
-	assert!(pos_goal.x < self.cells.extents()[0] as i32);
-	assert!(pos_goal.y < self.cells.extents()[1] as i32);
+    assert!(pos_goal.x >= 0);
+    assert!(pos_goal.y >= 0);
+    assert!(pos_goal.x < self.cells.extents()[0] as i32);
+    assert!(pos_goal.y < self.cells.extents()[1] as i32);
 
     self.compute_distance_field(&[(0, pos_goal)])
 }
@@ -552,57 +552,57 @@ pub fn hides_player(&self, x: i32, y: i32) -> bool {
 pub fn find_guards_in_earshot(&mut self, emitter_pos: Point, radius: i32) -> Vec<&mut Guard> {
     let mut visited: Array2D<bool> = Array2D::new([self.cells.extents()[0], self.cells.extents()[1]], false);
 
-	// Flood-fill from the emitter position.
+    // Flood-fill from the emitter position.
 
-	let mut points: VecDeque<Point> = VecDeque::new();
-	points.push_back(emitter_pos);
-	visited[[emitter_pos.x as usize, emitter_pos.y as usize]] = true;
+    let mut points: VecDeque<Point> = VecDeque::new();
+    points.push_back(emitter_pos);
+    visited[[emitter_pos.x as usize, emitter_pos.y as usize]] = true;
 
-	while let Some(pos) = points.pop_front() {
+    while let Some(pos) = points.pop_front() {
         for dir in &SOUND_NEIGHBORS {
-			let new_pos = pos + *dir;
+            let new_pos = pos + *dir;
 
-			// Skip positions that are off the map.
+            // Skip positions that are off the map.
 
-			if new_pos.x < 0 || new_pos.x >= self.cells.extents()[0] as i32 ||
-				new_pos.y < 0 || new_pos.y >= self.cells.extents()[1] as i32 {
-				continue;
+            if new_pos.x < 0 || new_pos.x >= self.cells.extents()[0] as i32 ||
+                new_pos.y < 0 || new_pos.y >= self.cells.extents()[1] as i32 {
+                continue;
             }
 
-			// Skip neighbors that have already been visited.
+            // Skip neighbors that have already been visited.
 
-			if visited[[new_pos.x as usize, new_pos.y as usize]] {
-				continue;
+            if visited[[new_pos.x as usize, new_pos.y as usize]] {
+                continue;
             }
 
-			// Skip neighbors that are outside of the hearing radius.
+            // Skip neighbors that are outside of the hearing radius.
 
-			let d = new_pos - emitter_pos;
-			let d2 = d.length_squared();
-			if d2 >= radius {
-				continue;
+            let d = new_pos - emitter_pos;
+            let d2 = d.length_squared();
+            if d2 >= radius {
+                continue;
             }
 
-			// Skip neighbors that don't transmit sound
+            // Skip neighbors that don't transmit sound
 
-			if self.cells[[new_pos.x as usize, new_pos.y as usize]].blocks_sound {
-				continue;
+            if self.cells[[new_pos.x as usize, new_pos.y as usize]].blocks_sound {
+                continue;
             }
 
             visited[[new_pos.x as usize, new_pos.y as usize]] = true;
-			points.push_back(new_pos);
-		}
-	}
+            points.push_back(new_pos);
+        }
+    }
 
-	// Return guards that are on marked squares.
+    // Return guards that are on marked squares.
 
     let mut guards = Vec::with_capacity(self.guards.len());
 
     for guard in &mut self.guards {
-		if visited[[guard.pos.x as usize, guard.pos.y as usize]] {
-			guards.push(guard);
+        if visited[[guard.pos.x as usize, guard.pos.y as usize]] {
+            guards.push(guard);
         }
-	}
+    }
 
     guards
 }

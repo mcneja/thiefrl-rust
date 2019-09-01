@@ -40,18 +40,18 @@ fn main() {
 fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
     let player = &mut game.player;
 
-	// Can't move if you're dead.
+    // Can't move if you're dead.
 
-	if player.health == 0 {
-		return;
+    if player.health == 0 {
+        return;
     }
 
-	// Are we trying to exit the level?
+    // Are we trying to exit the level?
 
     let pos_new = Point::new(player.pos.x + dx, player.pos.y + dy);
 
-	if !on_level(&game.map.cells, pos_new) && /* game.map.all_seen() && */ game.map.all_loot_collected() {
-		game.level += 1;
+    if !on_level(&game.map.cells, pos_new) && /* game.map.all_seen() && */ game.map.all_loot_collected() {
+        game.level += 1;
         game.map = random_map::generate_map(&mut game.rng, game.level);
 
         game.player.pos = game.map.pos_start;
@@ -63,11 +63,11 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
         game.player.turns_remaining_underwater = 0;
         game.player.game_over = false;
 
-		return;
-	}
+        return;
+    }
 
     if dx == 0 || dy == 0 {
-	    if blocked(&game.map, &player.pos, &pos_new) {
+        if blocked(&game.map, &player.pos, &pos_new) {
             return;
         }
     } else if blocked(&game.map, &player.pos, &pos_new) {
@@ -76,8 +76,8 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
         } else {
             // Attempting to move diagonally; may be able to slide along a wall.
 
-			let v_blocked = blocked(&game.map, &player.pos, &(player.pos + Point::new(dx, 0)));
-			let h_blocked = blocked(&game.map, &player.pos, &(player.pos + Point::new(0, dy)));
+            let v_blocked = blocked(&game.map, &player.pos, &(player.pos + Point::new(dx, 0)));
+            let h_blocked = blocked(&game.map, &player.pos, &(player.pos + Point::new(0, dy)));
 
             if v_blocked {
                 if h_blocked {
@@ -93,35 +93,35 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
                 dy = 0;
             }
         }
-	}
+    }
 
-	pre_turn(game);
+    pre_turn(game);
 
     let dpos = Point::new(dx, dy);
-	game.player.dir = dpos;
-	game.player.pos += dpos;
-	game.player.gold += game.map.collect_loot_at(game.player.pos);
+    game.player.dir = dpos;
+    game.player.pos += dpos;
+    game.player.gold += game.map.collect_loot_at(game.player.pos);
 
-	// Generate movement noises.
+    // Generate movement noises.
 
-	let cell_type = game.map.cells[[game.player.pos.x as usize, game.player.pos.y as usize]].cell_type;
+    let cell_type = game.map.cells[[game.player.pos.x as usize, game.player.pos.y as usize]].cell_type;
 
-	if cell_type == CellType::GroundWoodCreaky {
-		make_noise(&mut game.map, &mut game.player, "\u{AE}creak\u{AF}");
-	}
+    if cell_type == CellType::GroundWoodCreaky {
+        make_noise(&mut game.map, &mut game.player, "\u{AE}creak\u{AF}");
+    }
 
     advance_time(game);
 }
 
 fn make_noise(map: &mut Map, player: &mut Player, _noise: &str) {
-	player.noisy = true;
-//	txt::noise(game.player.pos, noise);
+    player.noisy = true;
+//  txt::noise(game.player.pos, noise);
 
     let guards = map.find_guards_in_earshot(player.pos, 75);
 
     for guard in guards {
-		guard.hear_thief();
-	}
+        guard.hear_thief();
+    }
 }
 
 fn halts_slide(map: &Map, pos: &Point) -> bool {
@@ -137,50 +137,50 @@ fn halts_slide(map: &Map, pos: &Point) -> bool {
 }
 
 fn pre_turn(game: &mut Game) {
-//	s_show_msgs = true;
-//	s_bump_msg.clear();
-//	txt::clear();
-	game.player.noisy = false;
-	game.player.damaged_last_turn = false;
-	game.player.dir = Point::new(0, 0);
+//  s_show_msgs = true;
+//  s_bump_msg.clear();
+//  txt::clear();
+    game.player.noisy = false;
+    game.player.damaged_last_turn = false;
+    game.player.dir = Point::new(0, 0);
 }
 
 fn advance_time(game: &mut Game) {
-	if game.map.cells[[game.player.pos.x as usize, game.player.pos.y as usize]].cell_type == CellType::GroundWater {
-		if game.player.turns_remaining_underwater > 0 {
-			game.player.turns_remaining_underwater -= 1;
+    if game.map.cells[[game.player.pos.x as usize, game.player.pos.y as usize]].cell_type == CellType::GroundWater {
+        if game.player.turns_remaining_underwater > 0 {
+            game.player.turns_remaining_underwater -= 1;
         }
-	} else {
-		game.player.turns_remaining_underwater = 7;
-	}
+    } else {
+        game.player.turns_remaining_underwater = 7;
+    }
 
-	guard_act_all(&mut game.rng, &mut game.lines, &mut game.map, &mut game.player);
+    guard_act_all(&mut game.rng, &mut game.lines, &mut game.map, &mut game.player);
 
 /*
-	map.recomputeVisibility(game.player.pos);
+    map.recomputeVisibility(game.player.pos);
 */
 
-	if game.map.all_seen() && game.map.all_loot_collected() {
-		game.player.finished_level = true;
-	}
+    if game.map.all_seen() && game.map.all_loot_collected() {
+        game.player.finished_level = true;
+    }
 }
 
 fn on_level(map: &CellGrid, pos: Point) -> bool {
     let size_x = map.extents()[0] as i32;
     let size_y = map.extents()[1] as i32;
-	pos.x >= 0 && pos.y >= 0 && pos.x < size_x && pos.y < size_y
+    pos.x >= 0 && pos.y >= 0 && pos.x < size_x && pos.y < size_y
 }
 
 fn blocked(map: &Map, pos_old: &Point, pos_new: &Point) -> bool {
-	if !on_level(&map.cells, *pos_new) {
-		return true;
+    if !on_level(&map.cells, *pos_new) {
+        return true;
     }
 
     let tile_type = map.cells[[pos_new.x as usize, pos_new.y as usize]].cell_type;
     let tile = tile_def(tile_type);
 
-	if tile.blocks_player {
-		return true;
+    if tile.blocks_player {
+        return true;
     }
 
     if tile_type == CellType::OneWayWindowE && pos_new.x <= pos_old.x {
@@ -203,7 +203,7 @@ fn blocked(map: &Map, pos_old: &Point, pos_new: &Point) -> bool {
         return true;
     }
 
-	false
+    false
 }
 
 fn glyph_for_item(kind: ItemKind) -> usize {
@@ -401,7 +401,7 @@ impl State for Game {
 /*
             if let Some(guard) = guards.first() {
                 if guard.region_goal != INVALID_REGION {
-                	let distance_field = map.compute_distances_to_region(guard.region_goal);
+                    let distance_field = map.compute_distances_to_region(guard.region_goal);
                     for x in 0..map_size_x {
                         for y in 0..map_size_y {
                             let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
