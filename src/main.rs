@@ -3,19 +3,24 @@ mod color_preset;
 mod fontdata;
 mod guard;
 mod random_map;
+mod speech_bubbles;
 
 use rand::prelude::*;
 
 use crate::cell_grid::*;
 use crate::guard::*;
+use crate::speech_bubbles::*;
 
 use quicksilver::{
     geom::{Rectangle, Vector},
-    graphics::{Background::{Blended, Img}, Color, Image},
+    graphics::{Background::{Blended, Col}, Color, Image},
     input::Key,
     lifecycle::{run, Asset, Event, Settings, State, Window},
     Future, Result,
 };
+
+const BAR_HEIGHT: i32 = fontdata::LINE_HEIGHT + 2;
+const BAR_BACKGROUND_COLOR: Color = Color { r: 0.0625, g: 0.0625, b: 0.0625, a: 1.0 };
 
 struct Game {
     rng: MyRng,
@@ -232,15 +237,6 @@ fn color_for_item(kind: ItemKind) -> Color {
     }
 }
 
-fn put_glyph(window: &mut Window, font_image: &Image, x: i32, y: i32, glyph_id: usize) {
-    if let Some(glyph) = crate::fontdata::GLYPH.iter().find(|&glyph| glyph.id == glyph_id) {
-        window.draw(
-            &Rectangle::new((x + glyph.x_offset, y + glyph.y_offset + crate::fontdata::BASE), (glyph.width, glyph.height)),
-            Img(&font_image.subimage(Rectangle::new((glyph.x, glyph.y), (glyph.width, glyph.height))))
-        );
-    }
-}
-
 impl State for Game {
     /// Load the assets and initialise the game
     fn new() -> Result<Self> {
@@ -317,6 +313,7 @@ impl State for Game {
         let guards = &self.map.guards;
         let player = &self.player;
         let font_image = &self.font_image;
+        let level = self.level;
 
         self.tileset.execute(|tileset| {
             for x in 0..map_size_x {
@@ -459,13 +456,104 @@ impl State for Game {
             }
 */
 
-            put_glyph(window, font_image, 16, 192, 65);
-            put_glyph(window, font_image, 32, 192, 66);
-            put_glyph(window, font_image, 48, 192, 67);
+            window.flush()?;
+
+            draw_status(window, font_image, tileset, map, player, level);
 
             Ok(())
         })?;
 
         Ok(())
+    }
+}
+
+fn draw_status(window: &mut Window, font_image: &Image, tileset: &Vec<Image>, map: &Map, player: &Player, level: usize) {
+    let screen_size = window.screen_size();
+    let screen_size_x: i32 = screen_size.x as i32;
+    let screen_size_y: i32 = screen_size.y as i32;
+    window.draw(
+        &Rectangle::new((0, screen_size_y - BAR_HEIGHT), (screen_size_x, BAR_HEIGHT)),
+        Col(BAR_BACKGROUND_COLOR),
+    );
+
+	let y_base = screen_size_y - BAR_HEIGHT;
+
+    const HEALTH_COLOR: Color = Color { r: 0.65625, g: 0.0, b: 0.0, a: 1.0 };
+    let mut x = 8;
+    x = puts_proportional(window, font_image, x, y_base, "Health", &HEALTH_COLOR);
+    x += 12;
+
+    let tile_healthy = &tileset[213];
+    let tile_unhealthy = &tileset[7];
+
+    const TILE_SIZE_X: i32 = 16;
+
+    for i in 0..player.health {
+        window.draw(
+            &Rectangle::new((x, y_base + 5), tile_healthy.area().size()),
+            Blended(tile_healthy, HEALTH_COLOR)
+        );
+        x += TILE_SIZE_X;
+    }
+    for i in player.health..player.max_health {
+        window.draw(
+            &Rectangle::new((x, y_base + 5), tile_unhealthy.area().size()),
+            Blended(tile_unhealthy, HEALTH_COLOR)
+        );
+        x += TILE_SIZE_X;
+    }
+
+    let player_underwater = map.cells[[player.pos.x as usize, player.pos.y as usize]].cell_type == CellType::GroundWater && player.turns_remaining_underwater > 0;
+
+    if player_underwater {
+        const AIR_COLOR: Color = Color { r: 0.328, g: 0.992, b: 0.992, a: 1.0 };
+        const NO_AIR_COLOR: Color = Color { r: 0.0, g: 0.65625, b: 0.65625, a: 1.0 };
+
+        x = screen_size_x / 4 - 16;
+        x = puts_proportional(window, font_image, x, y_base, "Air", &AIR_COLOR);
+        x += 8;
+
+        let tile_air = &tileset[214];
+        let tile_no_air = &tileset[7];
+
+        for i in 0..player.turns_remaining_underwater - 1 {
+            window.draw(
+                &Rectangle::new((x, y_base + 5), tile_air.area().size()),
+                Blended(tile_air, AIR_COLOR)
+            );
+            x += TILE_SIZE_X;
+        }
+        for i in player.turns_remaining_underwater - 1 .. 5 {
+            window.draw(
+                &Rectangle::new((x, y_base + 5), tile_no_air.area().size()),
+                Blended(tile_no_air, NO_AIR_COLOR)
+            );
+            x += TILE_SIZE_X;
+        }
+    }
+
+    // Draw the tallies of what's been seen and collected.
+
+    let percent_seen: usize = 100; // map.percent_seen();
+
+    {
+        const COLOR: Color = Color { r: 0.212, g: 0.212, b: 0.212, a: 1.0 };
+        let seen_msg = format!("Level {}: {}% Seen", level + 1, percent_seen);
+        let (x_min, x_max) = get_horizontal_extents(&seen_msg);
+        let x = (screen_size_x - (x_max - x_min)) / 2;
+        puts_proportional(window, font_image, x, y_base, &seen_msg, &COLOR);
+    }
+
+    {
+        const COLOR: Color = Color { r: 0.996, g: 0.996, b: 0.212, a: 1.0 };
+        let loot_msg =
+            if percent_seen < 100 {
+                format!("Loot {}/?", player.gold)
+            } else {
+                format!("Loot {}/{}", player.gold, map.total_loot)
+            };
+        let (x_min, x_max) = get_horizontal_extents(&loot_msg);
+        let x = screen_size_x - (8 + (x_max - x_min));
+        puts_proportional(window, font_image, x, y_base, &loot_msg, &COLOR);
     }
 }

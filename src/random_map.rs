@@ -88,6 +88,7 @@ fn generate_siheyuan(rng: &mut MyRng, level: usize) -> Map {
         patrol_routes: Vec::new(),
         guards: Vec::new(),
         pos_start: Point::new(0, 0),
+        total_loot: 0,
     };
 
     let (rooms, adjacencies, pos_start) = create_exits(
@@ -120,6 +121,8 @@ fn generate_siheyuan(rng: &mut MyRng, level: usize) -> Map {
     mark_exterior_as_seen(&mut map);
 
     cache_cell_info(&mut map);
+
+    map.total_loot = map.items.iter().filter(|&item| item.kind == ItemKind::Coin).count();
 
     map
 }

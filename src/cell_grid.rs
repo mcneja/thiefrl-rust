@@ -74,6 +74,7 @@ pub struct Map {
     pub items: Vec<Item>,
     pub guards: Vec<Guard>,
     pub pos_start: Point,
+    pub total_loot: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
