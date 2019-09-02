@@ -331,6 +331,20 @@ pub fn all_seen(&self) -> bool {
     true
 }
 
+pub fn percent_seen(&self) -> usize {
+    let mut num_seen: usize = 0;
+    for x in 0..self.cells.extents()[0] {
+        for y in 0..self.cells.extents()[1] {
+            if self.cells[[x, y]].seen {
+                num_seen += 1;
+            }
+        }
+    }
+
+	let num_to_see: usize = self.cells.extents()[0] * self.cells.extents()[1];
+	(num_seen * 100) / num_to_see
+}
+
 pub fn all_loot_collected(&self) -> bool {
     for item in &self.items {
         if item.kind == ItemKind::Coin {

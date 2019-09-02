@@ -55,7 +55,7 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
 
     let pos_new = Point::new(player.pos.x + dx, player.pos.y + dy);
 
-    if !on_level(&game.map.cells, pos_new) && /* game.map.all_seen() && */ game.map.all_loot_collected() {
+    if !on_level(&game.map.cells, pos_new) && game.map.all_seen() && game.map.all_loot_collected() {
         game.level += 1;
         game.map = random_map::generate_map(&mut game.rng, game.level);
 
@@ -458,7 +458,8 @@ impl State for Game {
 
             window.flush()?;
 
-            draw_status(window, font_image, tileset, map, player, level);
+//            draw_top_status_bar(window, font_image, player, level);
+            draw_bottom_status_bar(window, font_image, tileset, map, player, level);
 
             Ok(())
         })?;
@@ -467,7 +468,7 @@ impl State for Game {
     }
 }
 
-fn draw_status(window: &mut Window, font_image: &Image, tileset: &Vec<Image>, map: &Map, player: &Player, level: usize) {
+fn draw_bottom_status_bar(window: &mut Window, font_image: &Image, tileset: &Vec<Image>, map: &Map, player: &Player, level: usize) {
     let screen_size = window.screen_size();
     let screen_size_x: i32 = screen_size.x as i32;
     let screen_size_y: i32 = screen_size.y as i32;
@@ -534,7 +535,7 @@ fn draw_status(window: &mut Window, font_image: &Image, tileset: &Vec<Image>, ma
 
     // Draw the tallies of what's been seen and collected.
 
-    let percent_seen: usize = 100; // map.percent_seen();
+    let percent_seen: usize = map.percent_seen();
 
     {
         const COLOR: Color = Color { r: 0.212, g: 0.212, b: 0.212, a: 1.0 };
@@ -555,5 +556,47 @@ fn draw_status(window: &mut Window, font_image: &Image, tileset: &Vec<Image>, ma
         let (x_min, x_max) = get_horizontal_extents(&loot_msg);
         let x = screen_size_x - (8 + (x_max - x_min));
         puts_proportional(window, font_image, x, y_base, &loot_msg, &COLOR);
+    }
+}
+
+fn draw_top_status_bar(window: &mut Window, font_image: &Image, player: &Player, level: usize) {
+    let screen_size = window.screen_size();
+    let screen_size_x: i32 = screen_size.x as i32;
+    window.draw(
+        &Rectangle::new((0, 0), (screen_size_x, BAR_HEIGHT)),
+        Col(BAR_BACKGROUND_COLOR),
+    );
+
+	let y_base = BAR_HEIGHT - fontdata::LINE_HEIGHT;
+
+/*
+    if s_showHelp {
+        sprintf_s(msgBuffer, sizeof(msgBuffer), "Page %d of %d", s_helpPage + 1, 2);
+
+        int xMin, xMax;
+        txt::getHorizontalExtents(msgBuffer, xMin, xMax);
+
+        int x = screenSizeX - (8 + (xMax - xMin));
+
+        txt::putsProportional(x, y_base, msgBuffer);
+
+        "Press left/right arrow keys to view help, or F1 to close"
+    } else
+*/
+    {
+        let msg =
+            if player.game_over || player.health == 0 {
+                format!("You are dead! Press Ctrl+N for a new game or Ctrl+R to restart.")
+            } else if player.finished_level {
+                format!("Level {} complete! Move off the edge of the map to advance to the next level.", level + 1)
+            } else if level == 0 {
+                format!("Welcome to level {}. Collect the gold coins and reveal the whole mansion. (Press F1 for help.)", level + 1)
+            } else if level == 1 {
+                format!("Welcome to level {}. Watch out for the patrolling guard! (Press F1 for help.)", level + 1)
+            } else {
+                format!("Press F1 for help")
+            };
+
+        puts_proportional(window, font_image, 8, y_base, &msg, &color_preset::WHITE);
     }
 }

@@ -301,7 +301,7 @@ fn plot_walls(inside: &Array2D<bool>, offset_x: &Array2D<i32>, offset_y: &Array2
         blocks_sound: false,
         hides_player: false,
         lit: false,
-        seen: false,
+        seen: true, // false,
     };
     let mut map = CellGrid::new([map_x as usize, map_y as usize], default_cell);
 
