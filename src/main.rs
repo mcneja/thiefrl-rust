@@ -22,15 +22,20 @@ use quicksilver::{
 const BAR_HEIGHT: i32 = fontdata::LINE_HEIGHT + 2;
 const BAR_BACKGROUND_COLOR: Color = Color { r: 0.0625, g: 0.0625, b: 0.0625, a: 1.0 };
 
+const TILE_SIZE: Vector = Vector { x: 16.0, y: 16.0 };
+
 struct Game {
     rng: MyRng,
     level: usize,
     map: Map,
     lines: Lines,
     player: Player,
-    tileset: Asset<Vec<Image>>,
-    tile_size_px: Vector,
     font_image: Image,
+}
+
+struct CrappyAppWrapper {
+    game: Game,
+    tileset_asset: Asset<Vec<Image>>,
 }
 
 fn main() {
@@ -39,7 +44,7 @@ fn main() {
         resize: quicksilver::graphics::ResizeStrategy::Maintain,
         ..Default::default()
     };
-    run::<Game>("ThiefRL 3", Vector::new(880, 760), settings);
+    run::<CrappyAppWrapper>("ThiefRL 3", Vector::new(880, 760), settings);
 }
 
 fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
@@ -143,7 +148,6 @@ fn halts_slide(map: &Map, pos: &Point) -> bool {
 
 fn pre_turn(game: &mut Game) {
 //  s_show_msgs = true;
-//  s_bump_msg.clear();
 //  txt::clear();
     game.player.noisy = false;
     game.player.damaged_last_turn = false;
@@ -237,18 +241,17 @@ fn color_for_item(kind: ItemKind) -> Color {
     }
 }
 
-impl State for Game {
+impl State for CrappyAppWrapper {
     /// Load the assets and initialise the game
     fn new() -> Result<Self> {
         let tiles_file = "tiles.png";
-        let tile_size_px = Vector::new(16, 16);
 
-        let tileset = Asset::new(Image::load(tiles_file).and_then(move |tiles| {
+        let tileset_asset = Asset::new(Image::load(tiles_file).and_then(move |tiles| {
             let mut tileset = Vec::with_capacity(256);
             for y in 0..16 {
                 for x in 0..16 {
-                    let pos_px = tile_size_px.times(Vector::new(x, 15 - y));
-                    let rect = Rectangle::new(pos_px, tile_size_px);
+                    let pos_px = TILE_SIZE.times(Vector::new(x, 15 - y));
+                    let rect = Rectangle::new(pos_px, TILE_SIZE);
                     let tile = tiles.subimage(rect);
                     tileset.push(tile);
                 }
@@ -266,14 +269,15 @@ impl State for Game {
         let lines = new_lines();
 
         Ok(Self {
-            rng,
-            level: 0,
-            lines,
-            map,
-            player,
-            tileset,
-            tile_size_px,
-            font_image
+            game: Game {
+                rng,
+                level: 0,
+                lines,
+                map,
+                player,
+                font_image,
+            },
+            tileset_asset,
        })
     }
 
@@ -282,15 +286,15 @@ impl State for Game {
         match event {
             Event::Key(key, quicksilver::input::ButtonState::Pressed) =>
                 match key {
-                    Key::Numpad1 | Key::End      => move_player(self, -1, -1),
-                    Key::Numpad2 | Key::Down     => move_player(self,  0, -1),
-                    Key::Numpad3 | Key::PageDown => move_player(self,  1, -1),
-                    Key::Numpad4 | Key::Left     => move_player(self, -1,  0),
-                    Key::Numpad5                 => move_player(self,  0,  0),
-                    Key::Numpad6 | Key::Right    => move_player(self,  1,  0),
-                    Key::Numpad7 | Key::Home     => move_player(self, -1,  1),
-                    Key::Numpad8 | Key::Up       => move_player(self,  0,  1),
-                    Key::Numpad9 | Key::PageUp   => move_player(self,  1,  1),
+                    Key::Numpad1 | Key::End      => move_player(&mut self.game, -1, -1),
+                    Key::Numpad2 | Key::Down     => move_player(&mut self.game,  0, -1),
+                    Key::Numpad3 | Key::PageDown => move_player(&mut self.game,  1, -1),
+                    Key::Numpad4 | Key::Left     => move_player(&mut self.game, -1,  0),
+                    Key::Numpad5                 => move_player(&mut self.game,  0,  0),
+                    Key::Numpad6 | Key::Right    => move_player(&mut self.game,  1,  0),
+                    Key::Numpad7 | Key::Home     => move_player(&mut self.game, -1,  1),
+                    Key::Numpad8 | Key::Up       => move_player(&mut self.game,  0,  1),
+                    Key::Numpad9 | Key::PageUp   => move_player(&mut self.game,  1,  1),
                     Key::Escape                  => window.close(),
                     _ => ()
                 }
@@ -303,168 +307,181 @@ impl State for Game {
     fn draw(&mut self, window: &mut Window) -> Result<()> {
         window.clear(color_preset::BLACK)?;
 
-        let tile_size_px = self.tile_size_px;
-        let offset_px = Vector::new(0, 0);
+        let game = &self.game;
+
+        self.tileset_asset.execute(|tileset| {
+            game.draw_to_window(tileset, window);
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+}
+
+impl Game {
+    fn draw_to_window(&self, tileset: &Vec<Image>, window: &mut Window) {
+
+        let screen_size = window.screen_size();
+        let screen_size_x: usize = screen_size.x as usize;
+        let screen_size_y: usize = screen_size.y as usize;
 
         let map = &self.map;
         let map_size_x = map.cells.extents()[0];
         let map_size_y = map.cells.extents()[1];
+
+        let map_screen_size = TILE_SIZE.times(Vector::new(map_size_x as f32, map_size_y as f32));
+
+        let offset_px = Vector::new((screen_size_x as f32 - map_screen_size.x) / 2.0, BAR_HEIGHT as f32 + (screen_size_y as f32 - ((2 * BAR_HEIGHT) as f32 + map_screen_size.y)) / 2.0);
+
         let items = &self.map.items;
-        let guards = &self.map.guards;
         let player = &self.player;
+        let guards = &self.map.guards;
         let font_image = &self.font_image;
-        let level = self.level;
 
-        self.tileset.execute(|tileset| {
-            for x in 0..map_size_x {
-                for y in 0..map_size_y {
-                    let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
-                    let cell = &map.cells[[x, y]];
-                    let tile = tile_def(cell.cell_type);
-                    let image = &tileset[tile.glyph];
-                    let pos_px = offset_px + tile_size_px.times(pos);
-                    let color = if cell.lit || tile.ignores_lighting {tile.color} else {color_preset::DARK_BLUE};
-                    window.draw(
-                        &Rectangle::new(pos_px, image.area().size()),
-                        Blended(&image, color),
-                    )
-                }
-            }
-            for item in items {
-                let pos = Vector::new(item.pos.x, (map_size_y - 1) as i32 - item.pos.y);
-                let cell = &map.cells[[item.pos.x as usize, item.pos.y as usize]];
-                let pos_px = offset_px + pos.times(tile_size_px);
-                let glyph = glyph_for_item(item.kind);
-                let color = if cell.lit {color_for_item(item.kind)} else {color_preset::DARK_BLUE};
-                let image = &tileset[glyph];
+        for x in 0..map_size_x {
+            for y in 0..map_size_y {
+                let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
+                let cell = &map.cells[[x, y]];
+                let tile = tile_def(cell.cell_type);
+                let image = &tileset[tile.glyph];
+                let pos_px = offset_px + TILE_SIZE.times(pos);
+                let color = if cell.lit || tile.ignores_lighting {tile.color} else {color_preset::DARK_BLUE};
                 window.draw(
                     &Rectangle::new(pos_px, image.area().size()),
                     Blended(&image, color),
-                );
+                )
             }
-            {
-                let glyph = 208;
+        }
+        for item in items {
+            let pos = Vector::new(item.pos.x, (map_size_y - 1) as i32 - item.pos.y);
+            let cell = &map.cells[[item.pos.x as usize, item.pos.y as usize]];
+            let pos_px = offset_px + pos.times(TILE_SIZE);
+            let glyph = glyph_for_item(item.kind);
+            let color = if cell.lit {color_for_item(item.kind)} else {color_preset::DARK_BLUE};
+            let image = &tileset[glyph];
+            window.draw(
+                &Rectangle::new(pos_px, image.area().size()),
+                Blended(&image, color),
+            );
+        }
+        {
+            let glyph = 208;
 
-                let lit = map.cells[[player.pos.x as usize, player.pos.y as usize]].lit;
-                let noisy = player.noisy;
-                let damaged = player.damaged_last_turn;
-                let hidden = player.hidden(map);
+            let lit = map.cells[[player.pos.x as usize, player.pos.y as usize]].lit;
+            let noisy = player.noisy;
+            let damaged = player.damaged_last_turn;
+            let hidden = player.hidden(map);
 
-                let color =
-                    if damaged {Color {r: 1.0, g: 0.0, b: 0.0, a: 1.0}}
-                    else if noisy {color_preset::LIGHT_CYAN}
-                    else if hidden {Color {r: 0.0625, g: 0.0625, b: 0.0625, a: 0.875}}
-                    else if lit {color_preset::LIGHT_GRAY}
-                    else {color_preset::LIGHT_BLUE};
+            let color =
+                if damaged {Color {r: 1.0, g: 0.0, b: 0.0, a: 1.0}}
+                else if noisy {color_preset::LIGHT_CYAN}
+                else if hidden {Color {r: 0.0625, g: 0.0625, b: 0.0625, a: 0.875}}
+                else if lit {color_preset::LIGHT_GRAY}
+                else {color_preset::LIGHT_BLUE};
 
-                let image = &tileset[glyph];
-                let pos = Vector::new(player.pos.x, (map_size_y - 1) as i32 - player.pos.y);
-                let pos_px = offset_px + pos.times(tile_size_px);
-                window.draw(
-                    &Rectangle::new(pos_px, image.area().size()),
-                    Blended(&image, color),
-                );
-            }
-            for guard in guards {
-                let glyph =
-                    if guard.dir.y > 0 {210}
-                    else if guard.dir.y < 0 {212}
-                    else if guard.dir.x > 0 {209}
-                    else if guard.dir.x < 0 {211}
-                    else {212};
+            let image = &tileset[glyph];
+            let pos = Vector::new(player.pos.x, (map_size_y - 1) as i32 - player.pos.y);
+            let pos_px = offset_px + pos.times(TILE_SIZE);
+            window.draw(
+                &Rectangle::new(pos_px, image.area().size()),
+                Blended(&image, color),
+            );
+        }
+        for guard in guards {
+            let glyph =
+                if guard.dir.y > 0 {210}
+                else if guard.dir.y < 0 {212}
+                else if guard.dir.x > 0 {209}
+                else if guard.dir.x < 0 {211}
+                else {212};
 
+            let image = &tileset[glyph];
+            let pos = Vector::new(guard.pos.x, (map_size_y - 1) as i32 - guard.pos.y);
+            let pos_px = offset_px + pos.times(TILE_SIZE);
+            let color = color_preset::LIGHT_MAGENTA;
+            window.draw(
+                &Rectangle::new(pos_px, image.area().size()),
+                Blended(&image, color)
+            );
+        }
+        for guard in guards {
+            if let Some(glyph) = guard.overhead_icon(map, player) {
                 let image = &tileset[glyph];
                 let pos = Vector::new(guard.pos.x, (map_size_y - 1) as i32 - guard.pos.y);
-                let pos_px = offset_px + pos.times(tile_size_px);
-                let color = color_preset::LIGHT_MAGENTA;
+                let pos_px = offset_px + pos.times(TILE_SIZE) - Vector::new(0, 10);
+                let color = color_preset::LIGHT_YELLOW;
                 window.draw(
                     &Rectangle::new(pos_px, image.area().size()),
                     Blended(&image, color)
                 );
             }
-            for guard in guards {
-                if let Some(glyph) = guard.overhead_icon(map, player) {
-                    let image = &tileset[glyph];
-                    let pos = Vector::new(guard.pos.x, (map_size_y - 1) as i32 - guard.pos.y);
-                    let pos_px = offset_px + pos.times(tile_size_px) - Vector::new(0, 10);
-                    let color = color_preset::LIGHT_YELLOW;
-                    window.draw(
-                        &Rectangle::new(pos_px, image.area().size()),
-                        Blended(&image, color)
-                    );
-                }
-            }
+        }
 
 /*
-            if let Some(guard) = guards.first() {
-                if guard.region_goal != INVALID_REGION {
-                    let distance_field = map.compute_distances_to_region(guard.region_goal);
-                    for x in 0..map_size_x {
-                        for y in 0..map_size_y {
-                            let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
-                            let d = distance_field[[x, y]];
-                            if d == 0 || d == INFINITE_COST {
-                                continue;
-                            }
-                            let digit = (d % 10) + 48;
-                            let band = d / 10;
-                            let image = &tileset[digit];
-                            let pos_px = offset_px + tile_size_px.times(pos);
-                            let color = if band == 0 {color_preset::WHITE} else if band == 1 {color_preset::LIGHT_YELLOW} else {color_preset::DARK_GRAY};
-                            window.draw(
-                                &Rectangle::new(pos_px, image.area().size()),
-                                Blended(&image, color),
-                            )
+        if let Some(guard) = guards.first() {
+            if guard.region_goal != INVALID_REGION {
+                let distance_field = map.compute_distances_to_region(guard.region_goal);
+                for x in 0..map_size_x {
+                    for y in 0..map_size_y {
+                        let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
+                        let d = distance_field[[x, y]];
+                        if d == 0 || d == INFINITE_COST {
+                            continue;
                         }
+                        let digit = (d % 10) + 48;
+                        let band = d / 10;
+                        let image = &tileset[digit];
+                        let pos_px = offset_px + TILE_SIZE.times(pos);
+                        let color = if band == 0 {color_preset::WHITE} else if band == 1 {color_preset::LIGHT_YELLOW} else {color_preset::DARK_GRAY};
+                        window.draw(
+                            &Rectangle::new(pos_px, image.area().size()),
+                            Blended(&image, color),
+                        )
                     }
                 }
             }
+        }
 */
 
 /*
-            if let Some(guard) = guards.first() {
-                let image = &tileset[255];
-                if guard.region_prev != INVALID_REGION {
+        if let Some(guard) = guards.first() {
+            let image = &tileset[255];
+            if guard.region_prev != INVALID_REGION {
 
-                    let region = &map.patrol_regions[guard.region_prev];
-                    for x in region.pos_min.x .. region.pos_max.x {
-                        for y in region.pos_min.y .. region.pos_max.y {
-                            let pos = Vector::new(x as f32, ((map_size_y - 1) as i32 - y) as f32);
-                            let pos_px = offset_px + tile_size_px.times(pos);
-                            let color = Color {r:1.0, g:0.0, b:0.0, a:0.25};
-                            window.draw(
-                                &Rectangle::new(pos_px, image.area().size()),
-                                Blended(&image, color),
-                            )
-                        }
-                    }
-                }
-                if guard.region_goal != INVALID_REGION {
-                    let region = &map.patrol_regions[guard.region_goal];
-                    for x in region.pos_min.x .. region.pos_max.x {
-                        for y in region.pos_min.y .. region.pos_max.y {
-                            let pos = Vector::new(x as f32, ((map_size_y - 1) as i32 - y) as f32);
-                            let pos_px = offset_px + tile_size_px.times(pos);
-                            let color = Color {r:0.0, g:1.0, b:0.0, a:0.25};
-                            window.draw(
-                                &Rectangle::new(pos_px, image.area().size()),
-                                Blended(&image, color),
-                            )
-                        }
+                let region = &map.patrol_regions[guard.region_prev];
+                for x in region.pos_min.x .. region.pos_max.x {
+                    for y in region.pos_min.y .. region.pos_max.y {
+                        let pos = Vector::new(x as f32, ((map_size_y - 1) as i32 - y) as f32);
+                        let pos_px = offset_px + TILE_SIZE.times(pos);
+                        let color = Color {r:1.0, g:0.0, b:0.0, a:0.25};
+                        window.draw(
+                            &Rectangle::new(pos_px, image.area().size()),
+                            Blended(&image, color),
+                        )
                     }
                 }
             }
+            if guard.region_goal != INVALID_REGION {
+                let region = &map.patrol_regions[guard.region_goal];
+                for x in region.pos_min.x .. region.pos_max.x {
+                    for y in region.pos_min.y .. region.pos_max.y {
+                        let pos = Vector::new(x as f32, ((map_size_y - 1) as i32 - y) as f32);
+                        let pos_px = offset_px + TILE_SIZE.times(pos);
+                        let color = Color {r:0.0, g:1.0, b:0.0, a:0.25};
+                        window.draw(
+                            &Rectangle::new(pos_px, image.area().size()),
+                            Blended(&image, color),
+                        )
+                    }
+                }
+            }
+        }
 */
 
-            window.flush()?;
+        window.flush().unwrap();
 
-//            draw_top_status_bar(window, font_image, player, level);
-            draw_bottom_status_bar(window, font_image, tileset, map, player, level);
-
-            Ok(())
-        })?;
-
-        Ok(())
+        draw_top_status_bar(window, font_image, player, self.level);
+        draw_bottom_status_bar(window, font_image, tileset, map, player, self.level);
     }
 }
 
@@ -489,14 +506,14 @@ fn draw_bottom_status_bar(window: &mut Window, font_image: &Image, tileset: &Vec
 
     const TILE_SIZE_X: i32 = 16;
 
-    for i in 0..player.health {
+    for _ in 0..player.health {
         window.draw(
             &Rectangle::new((x, y_base + 5), tile_healthy.area().size()),
             Blended(tile_healthy, HEALTH_COLOR)
         );
         x += TILE_SIZE_X;
     }
-    for i in player.health..player.max_health {
+    for _ in player.health..player.max_health {
         window.draw(
             &Rectangle::new((x, y_base + 5), tile_unhealthy.area().size()),
             Blended(tile_unhealthy, HEALTH_COLOR)
@@ -517,14 +534,14 @@ fn draw_bottom_status_bar(window: &mut Window, font_image: &Image, tileset: &Vec
         let tile_air = &tileset[214];
         let tile_no_air = &tileset[7];
 
-        for i in 0..player.turns_remaining_underwater - 1 {
+        for _ in 0..player.turns_remaining_underwater - 1 {
             window.draw(
                 &Rectangle::new((x, y_base + 5), tile_air.area().size()),
                 Blended(tile_air, AIR_COLOR)
             );
             x += TILE_SIZE_X;
         }
-        for i in player.turns_remaining_underwater - 1 .. 5 {
+        for _ in player.turns_remaining_underwater - 1 .. 5 {
             window.draw(
                 &Rectangle::new((x, y_base + 5), tile_no_air.area().size()),
                 Blended(tile_no_air, NO_AIR_COLOR)
@@ -567,7 +584,7 @@ fn draw_top_status_bar(window: &mut Window, font_image: &Image, player: &Player,
         Col(BAR_BACKGROUND_COLOR),
     );
 
-	let y_base = BAR_HEIGHT - fontdata::LINE_HEIGHT;
+	let y_base = 0;
 
 /*
     if s_showHelp {
