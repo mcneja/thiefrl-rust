@@ -41,6 +41,14 @@ struct Adjacency
 }
 
 pub fn generate_map(rng: &mut MyRng, level: usize) -> Map {
+
+    for _ in 0..100 {
+        let map = generate_siheyuan(rng, level);
+        if !map.patrol_regions.is_empty() {
+            return map;
+        }
+    }
+
     generate_siheyuan(rng, level)
 }
 
