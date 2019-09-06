@@ -941,7 +941,7 @@ fn get_edge_sets(rng: &mut MyRng, adjacencies: &[Adjacency]) -> Vec<Vec<usize>> 
     edge_sets
 }
 
-fn connect_rooms(rng: &mut MyRng, mut rooms: &mut [Room], adjacencies: &mut [Adjacency]) -> Point {
+fn connect_rooms(rng: &mut MyRng, rooms: &mut [Room], adjacencies: &mut [Adjacency]) -> Point {
 
     // Collect sets of edges that are mirrors of each other
 
@@ -959,7 +959,7 @@ fn connect_rooms(rng: &mut MyRng, mut rooms: &mut [Room], adjacencies: &mut [Adj
         adj.door = true;
         let group0 = rooms[i0].group;
         let group1 = rooms[i1].group;
-        join_groups(&mut rooms, group0, group1);
+        join_groups(rooms, group0, group1);
     }
 
     // Connect all the interior rooms with doors.
@@ -984,7 +984,7 @@ fn connect_rooms(rng: &mut MyRng, mut rooms: &mut [Room], adjacencies: &mut [Adj
             if group0 != group1 || rng.gen_bool(1.0 / 3.0) {
                 adj.door = true;
                 added_door = true;
-                join_groups(&mut rooms, group0, group1);
+                join_groups(rooms, group0, group1);
             }
         }
 
@@ -999,7 +999,7 @@ fn connect_rooms(rng: &mut MyRng, mut rooms: &mut [Room], adjacencies: &mut [Adj
                 let group1 = rooms[i1].group;
 
                 adj.door = true;
-                join_groups(&mut rooms, group0, group1);
+                join_groups(rooms, group0, group1);
             }
         }
     }
@@ -1033,7 +1033,7 @@ fn connect_rooms(rng: &mut MyRng, mut rooms: &mut [Room], adjacencies: &mut [Adj
             if group0 != group1 || rng.gen_bool(1.0 / 3.0) {
                 adj.door = true;
                 added_door = true;
-                join_groups(&mut rooms, group0, group1);
+                join_groups(rooms, group0, group1);
             }
         }
 
@@ -1048,7 +1048,7 @@ fn connect_rooms(rng: &mut MyRng, mut rooms: &mut [Room], adjacencies: &mut [Adj
                 let group1 = rooms[i1].group;
 
                 adj.door = true;
-                join_groups(&mut rooms, group0, group1);
+                join_groups(rooms, group0, group1);
             }
         }
     }
@@ -1057,46 +1057,58 @@ fn connect_rooms(rng: &mut MyRng, mut rooms: &mut [Room], adjacencies: &mut [Adj
 
     let mut pos_start = Point::new(0, 0);
 
-    for (i, adj) in adjacencies.iter_mut().enumerate() {
-
-        if adj.dir.x == 0 {
-            continue;
-        }
-
-        if adj.next_matching > i {
-            continue;
-        }
-
-        if adj.next_matching == i {
-            if rooms[adj.room_right].room_type != RoomType::Exterior {
-                continue;
-            }
-        } else {
-            if rooms[adj.room_left].room_type != RoomType::Exterior {
-                continue;
-            }
-        }
+    {
+        let i = front_door_adjacency_index(rooms, adjacencies, &edge_sets);
 
         // Set the player's start position based on where the door is.
 
-        pos_start.x = adj.origin.x + adj.dir.x * (adj.length / 2);
+        pos_start.x = adjacencies[i].origin.x + adjacencies[i].dir.x * (adjacencies[i].length / 2);
         pos_start.y = OUTER_BORDER - 1;
 
-        adj.door = true;
+        adjacencies[i].door = true;
 
         // Break symmetry if the door is off center.
 
-/*
-        if adj.next_matching != i {
-            adjacencies[adj.next_matching].next_matching = adj.next_matching;
-            adj.next_matching = i;
+        let j = adjacencies[i].next_matching;
+        if j != i {
+            adjacencies[j].next_matching = j;
+            adjacencies[i].next_matching = i;
         }
-*/
-
-        break;
     }
 
     pos_start
+}
+
+fn front_door_adjacency_index(rooms: &[Room], adjacencies: &[Adjacency], edge_sets: &[Vec<usize>]) -> usize {
+    for edge_set in edge_sets {
+        for &i in edge_set {
+            let adj = &adjacencies[i];
+
+            if adj.dir.x == 0 {
+                continue;
+            }
+
+            if adj.next_matching > i {
+                continue;
+            }
+
+            if adj.next_matching == i {
+                if rooms[adj.room_right].room_type != RoomType::Exterior {
+                    continue;
+                }
+            } else {
+                if rooms[adj.room_left].room_type != RoomType::Exterior {
+                    continue;
+                }
+            }
+
+            return i;
+        }
+    }
+
+    // Should always return above...
+
+    0
 }
 
 fn join_groups(rooms: &mut [Room], group_from: usize, group_to: usize) {
