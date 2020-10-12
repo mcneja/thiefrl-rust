@@ -73,6 +73,8 @@ fn move_player(game: &mut Game, mut dx: i32, mut dy: i32) {
         game.player.turns_remaining_underwater = 0;
         game.player.game_over = false;
 
+        update_map_visibility(&mut game.map, game.player.pos);
+
         return;
     }
 
@@ -154,6 +156,13 @@ fn pre_turn(game: &mut Game) {
     game.player.dir = Point::new(0, 0);
 }
 
+const DIRS: [Point; 4] = [
+    Point { x: -1, y:  0 },
+    Point { x:  1, y:  0 },
+    Point { x:  0, y: -1 },
+    Point { x:  0, y:  1 },
+];
+
 fn advance_time(game: &mut Game) {
     if game.map.cells[[game.player.pos.x as usize, game.player.pos.y as usize]].cell_type == CellType::GroundWater {
         if game.player.turns_remaining_underwater > 0 {
@@ -165,12 +174,21 @@ fn advance_time(game: &mut Game) {
 
     guard_act_all(&mut game.rng, &mut game.lines, &mut game.map, &mut game.player);
 
-/*
-    map.recomputeVisibility(game.player.pos);
-*/
+    update_map_visibility(&mut game.map, game.player.pos);
 
     if game.map.all_seen() && game.map.all_loot_collected() {
         game.player.finished_level = true;
+    }
+}
+
+fn update_map_visibility(map: &mut Map, pos_viewer: Point) {
+    map.recompute_visibility(pos_viewer);
+
+    for dir in &DIRS {
+        let pos = pos_viewer + *dir;
+        if !blocked(map, &pos_viewer, &pos) {
+            map.recompute_visibility(pos);
+        }
     }
 }
 
@@ -264,9 +282,11 @@ impl State for CrappyAppWrapper {
         let random_seed = rand::random::<u64>();
         let mut rng = MyRng::seed_from_u64(random_seed);
         let level = 0;
-        let map = random_map::generate_map(&mut rng, level);
+        let mut map = random_map::generate_map(&mut rng, level);
         let player = make_player(&map.pos_start);
         let lines = new_lines();
+
+        update_map_visibility(&mut map, player.pos);
 
         Ok(Self {
             game: Game {
@@ -296,6 +316,15 @@ impl State for CrappyAppWrapper {
                     Key::Numpad8 | Key::Up       => move_player(&mut self.game,  0,  1),
                     Key::Numpad9 | Key::PageUp   => move_player(&mut self.game,  1,  1),
                     Key::Escape                  => window.close(),
+                    
+                    // TODO: Hot-keys should require Ctrl to be presssed
+
+                    Key::A => self.game.player.see_all = !self.game.player.see_all,
+                    Key::S => self.game.map.mark_all_seen(),
+                    Key::C => {
+                        self.game.map.mark_all_unseen();
+                        update_map_visibility(&mut self.game.map, self.game.player.pos);
+                    },
                     _ => ()
                 }
             _ => ()
@@ -342,6 +371,9 @@ impl Game {
             for y in 0..map_size_y {
                 let pos = Vector::new(x as f32, ((map_size_y - 1) - y) as f32);
                 let cell = &map.cells[[x, y]];
+                if !cell.seen && !player.see_all {
+                    continue;
+                }
                 let tile = tile_def(cell.cell_type);
                 let image = &tileset[tile.glyph];
                 let pos_px = offset_px + TILE_SIZE.times(pos);
@@ -355,6 +387,9 @@ impl Game {
         for item in items {
             let pos = Vector::new(item.pos.x, (map_size_y - 1) as i32 - item.pos.y);
             let cell = &map.cells[[item.pos.x as usize, item.pos.y as usize]];
+            if !cell.seen && !player.see_all {
+                continue;
+            }
             let pos_px = offset_px + pos.times(TILE_SIZE);
             let glyph = glyph_for_item(item.kind);
             let color = if cell.lit {color_for_item(item.kind)} else {color_preset::DARK_BLUE};
@@ -398,7 +433,27 @@ impl Game {
             let image = &tileset[glyph];
             let pos = Vector::new(guard.pos.x, (map_size_y - 1) as i32 - guard.pos.y);
             let pos_px = offset_px + pos.times(TILE_SIZE);
-            let color = color_preset::LIGHT_MAGENTA;
+            
+            let cell = &map.cells[[guard.pos.x as usize, guard.pos.y as usize]];
+            
+            let visible = player.see_all || cell.seen || guard.speaking;
+
+            if !visible {
+                let dpos = player.pos - guard.pos;
+                if dpos.length_squared() > 36 {
+                    continue;
+                }
+            }
+
+            let color =
+                if !visible {
+                    color_preset::DARK_GRAY
+                } else if guard.mode == GuardMode::Patrol && !guard.speaking && !cell.lit {
+                    color_preset::DARK_BLUE
+                } else {
+                    color_preset::LIGHT_MAGENTA
+                };
+
             window.draw(
                 &Rectangle::new(pos_px, image.area().size()),
                 Blended(&image, color)
@@ -494,7 +549,7 @@ fn draw_bottom_status_bar(window: &mut Window, font_image: &Image, tileset: &Vec
         Col(BAR_BACKGROUND_COLOR),
     );
 
-	let y_base = screen_size_y - BAR_HEIGHT;
+    let y_base = screen_size_y - BAR_HEIGHT;
 
     const HEALTH_COLOR: Color = Color { r: 0.65625, g: 0.0, b: 0.0, a: 1.0 };
     let mut x = 8;
@@ -584,7 +639,7 @@ fn draw_top_status_bar(window: &mut Window, font_image: &Image, player: &Player,
         Col(BAR_BACKGROUND_COLOR),
     );
 
-	let y_base = 0;
+    let y_base = 0;
 
 /*
     if s_showHelp {

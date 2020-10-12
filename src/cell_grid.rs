@@ -52,6 +52,7 @@ pub struct Cell {
     pub cell_type: CellType,
     pub move_cost: usize,
     pub region: usize,
+    pub blocks_player_sight: bool,
     pub blocks_sight: bool,
     pub blocks_sound: bool,
     pub hides_player: bool,
@@ -148,6 +149,7 @@ pub struct Tile {
     pub glyph: usize,
     pub color: quicksilver::graphics::Color,
     pub blocks_player: bool,
+    pub blocks_player_sight: bool,
     pub blocks_sight: bool,
     pub blocks_sound: bool,
     pub hides_player: bool,
@@ -156,39 +158,39 @@ pub struct Tile {
 
 pub fn tile_def(tile_type: CellType) -> &'static Tile {
     match tile_type {
-        CellType::GroundNormal     => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
-        CellType::GroundGrass      => &Tile { glyph: 132, color: color_preset::DARK_GREEN, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
-        CellType::GroundWater      => &Tile { glyph: 134, color: color_preset::LIGHT_BLUE, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
-        CellType::GroundMarble     => &Tile { glyph: 136, color: color_preset::DARK_CYAN, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
-        CellType::GroundWood       => &Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
-        CellType::GroundWoodCreaky => &Tile { glyph: 138, color: color_preset::DARK_GRAY, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
+        CellType::GroundNormal     => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
+        CellType::GroundGrass      => &Tile { glyph: 132, color: color_preset::DARK_GREEN, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
+        CellType::GroundWater      => &Tile { glyph: 134, color: color_preset::LIGHT_BLUE, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
+        CellType::GroundMarble     => &Tile { glyph: 136, color: color_preset::DARK_CYAN, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
+        CellType::GroundWood       => &Tile { glyph: 138, color: color_preset::DARK_BROWN, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
+        CellType::GroundWoodCreaky => &Tile { glyph: 138, color: color_preset::DARK_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: false },
 
                   //  NSEW
-        CellType::Wall0000 => &Tile { glyph: 176, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall0001 => &Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall0010 => &Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall0011 => &Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall0100 => &Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall0101 => &Tile { glyph: 179, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall0110 => &Tile { glyph: 182, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall0111 => &Tile { glyph: 185, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall1000 => &Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall1001 => &Tile { glyph: 180, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall1010 => &Tile { glyph: 181, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall1011 => &Tile { glyph: 184, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall1100 => &Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall1101 => &Tile { glyph: 186, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall1110 => &Tile { glyph: 183, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
-        CellType::Wall1111 => &Tile { glyph: 187, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall0000 => &Tile { glyph: 176, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: false, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall0001 => &Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall0010 => &Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall0011 => &Tile { glyph: 177, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall0100 => &Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall0101 => &Tile { glyph: 179, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall0110 => &Tile { glyph: 182, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall0111 => &Tile { glyph: 185, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall1000 => &Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall1001 => &Tile { glyph: 180, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall1010 => &Tile { glyph: 181, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall1011 => &Tile { glyph: 184, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall1100 => &Tile { glyph: 178, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall1101 => &Tile { glyph: 186, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall1110 => &Tile { glyph: 183, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
+        CellType::Wall1111 => &Tile { glyph: 187, color: color_preset::LIGHT_GRAY, blocks_player: true, blocks_player_sight: true, blocks_sight: true, blocks_sound: true, hides_player: false, ignores_lighting: true },
 
-        CellType::OneWayWindowE => &Tile { glyph: 196, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
-        CellType::OneWayWindowW => &Tile { glyph: 197, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
-        CellType::OneWayWindowN => &Tile { glyph: 198, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
-        CellType::OneWayWindowS => &Tile { glyph: 199, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
-        CellType::PortcullisNS  => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
-        CellType::PortcullisEW  => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
-        CellType::DoorNS        => &Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: true },
-        CellType::DoorEW        => &Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: true },
+        CellType::OneWayWindowE => &Tile { glyph: 196, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
+        CellType::OneWayWindowW => &Tile { glyph: 197, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
+        CellType::OneWayWindowN => &Tile { glyph: 198, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
+        CellType::OneWayWindowS => &Tile { glyph: 199, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: true, blocks_sound: false, hides_player: false, ignores_lighting: true },
+        CellType::PortcullisNS  => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: true },
+        CellType::PortcullisEW  => &Tile { glyph: 128, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: true },
+        CellType::DoorNS        => &Tile { glyph: 189, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: true },
+        CellType::DoorEW        => &Tile { glyph: 188, color: color_preset::LIGHT_GRAY, blocks_player: false, blocks_player_sight: false, blocks_sight: false, blocks_sound: false, hides_player: false, ignores_lighting: true },
     }
 }
 
@@ -252,7 +254,7 @@ pub fn make_player(pos: &Point) -> Player {
         damaged_last_turn: false,
         finished_level: false,
         turns_remaining_underwater: 0,
-        see_all: true, // false,
+        see_all: false,
         game_over: false,
     }
 }
@@ -311,6 +313,40 @@ const SOUND_NEIGHBORS: [Point; 4] = [
     Point { x:  0, y:  1 },
 ];
 
+struct PortalInfo {
+    // offset of left corner of portal relative to lower-left corner of cell:
+    lx: i32,
+    ly: i32,
+    // offset of right corner of portal relative to lower-left-corner of cell:
+    rx: i32,
+    ry: i32,
+    // offset of neighboring cell relative to this cell's coordinates:
+    nx: i32,
+    ny: i32,
+}
+
+const PORTAL: [PortalInfo; 4] = [
+    // lx, ly   rx, ry   nx, ny
+    PortalInfo { lx: -1, ly: -1, rx: -1, ry:  1, nx: -1, ny:  0 },
+    PortalInfo { lx: -1, ly:  1, rx:  1, ry:  1, nx:  0, ny:  1 },
+    PortalInfo { lx:  1, ly:  1, rx:  1, ry: -1, nx:  1, ny:  0 },
+    PortalInfo { lx:  1, ly: -1, rx: -1, ry: -1, nx:  0, ny: -1 },
+];
+
+fn a_right_of_b(ax: i32, ay: i32, bx: i32, by: i32) -> bool {
+    ax * by > ay * bx
+}
+
+fn allowed_direction(tile_type: CellType, dx: i32, dy: i32) -> bool {
+    match tile_type {
+        CellType::OneWayWindowE => dx > 0,
+        CellType::OneWayWindowW => dx < 0,
+        CellType::OneWayWindowN => dy > 0,
+        CellType::OneWayWindowS => dy < 0,
+        _ => true
+    }
+}
+
 impl Map {
 
 pub fn collect_loot_at(&mut self, pos: Point) -> usize {
@@ -341,8 +377,126 @@ pub fn percent_seen(&self) -> usize {
         }
     }
 
-	let num_to_see: usize = self.cells.extents()[0] * self.cells.extents()[1];
-	(num_seen * 100) / num_to_see
+    let num_to_see: usize = self.cells.extents()[0] * self.cells.extents()[1];
+    (num_seen * 100) / num_to_see
+}
+
+pub fn mark_all_seen(&mut self) {
+    for x in 0..self.cells.extents()[0] {
+        for y in 0..self.cells.extents()[1] {
+            self.cells[[x, y]].seen = true;
+        }
+    }
+}
+
+pub fn mark_all_unseen(&mut self) {
+    for x in 0..self.cells.extents()[0] {
+        for y in 0..self.cells.extents()[1] {
+            self.cells[[x, y]].seen = false;
+        }
+    }
+}
+
+pub fn recompute_visibility(&mut self, pos_viewer: Point) {
+    for portal in &PORTAL {
+        self.compute_visibility
+        (
+            pos_viewer.x, pos_viewer.y,
+            pos_viewer.x, pos_viewer.y,
+            portal.lx, portal.ly,
+            portal.rx, portal.ry
+        );
+    }
+}
+
+fn compute_visibility(
+    &mut self,
+    // Viewer map coordinates:
+    viewer_x: i32,
+    viewer_y: i32,
+    // Target cell map coordinates:
+    target_x: i32,
+    target_y: i32,
+    // Left edge of current view frustum (relative to viewer):
+    ldx: i32,
+    ldy: i32,
+    // Right edge of current view frustum (relative to viewer):
+    rdx: i32,
+    rdy: i32
+) {
+    // End recursion if the target cell is out of bounds.
+    if target_x < 0 || target_y < 0 || target_x as usize >= self.cells.extents()[0] || target_y as usize >= self.cells.extents()[1] {
+        return;
+    }
+
+    // End recursion if the target square is too far away.
+    let (dx, dy) = (2 * (target_x - viewer_x), 2 * (target_y - viewer_y));
+
+    if dx*dx + dy*dy > 1600 {
+        return;
+    }
+
+    // End recursion if the incoming direction is not allowed by the current cell type.
+    if !allowed_direction(self.cells[[target_x as usize, target_y as usize]].cell_type, dx, dy) {
+        return;
+    }
+
+    // This square is visible.
+    self.cells[[target_x as usize, target_y as usize]].seen = true;
+
+    // End recursion if the target square occludes the view.
+    if self.blocks_player_sight(target_x, target_y) {
+        return;
+    }
+
+    // Mark diagonally-adjacent squares as visible if their corners are visible
+    for x in 0..2 {
+        for y in 0..2 {
+            let nx = target_x + 2*x - 1;
+            let ny = target_y + 2*y - 1;
+            let cdx = dx + 2*x - 1;
+            let cdy = dy + 2*y - 1;
+            
+            if nx >= 0 &&
+               ny >= 0 &&
+               (nx as usize) < self.cells.extents()[0] &&
+               (ny as usize) < self.cells.extents()[1] &&
+               !a_right_of_b(ldx, ldy, cdx, cdy) &&
+               !a_right_of_b(cdx, cdy, rdx, rdy) {
+                self.cells[[nx as usize, ny as usize]].seen = true;
+            }
+        }
+    }
+
+    // Clip portals to adjacent squares and recurse through the visible portions
+    for portal in &PORTAL {
+        // Relative positions of the portal's left and right endpoints:
+        let (pldx, pldy) = (dx + portal.lx, dy + portal.ly);
+        let (prdx, prdy) = (dx + portal.rx, dy + portal.ry);
+
+        // Clip portal against current view frustum:
+        let (cldx, cldy) = if a_right_of_b(ldx, ldy, pldx, pldy) {
+            (ldx, ldy)
+        } else {
+            (pldx, pldy)
+        };
+        let (crdx, crdy) = if a_right_of_b(rdx, rdy, prdx, prdy) {
+            (prdx, prdy)
+        } else {
+            (rdx, rdy)
+        };
+
+        // If we can see through the clipped portal, recurse through it.
+        if a_right_of_b(crdx, crdy, cldx, cldy) {
+            self.compute_visibility
+            (
+                viewer_x, viewer_y,
+                target_x + portal.nx, target_y + portal.ny,
+                cldx, cldy,
+                crdx, crdy
+            );
+        }
+    }
 }
 
 pub fn all_loot_collected(&self) -> bool {
@@ -558,6 +712,10 @@ pub fn compute_distance_field(&self, initial_distances: &[(usize, Point)]) -> Ar
 
 pub fn blocks_sight(&self, x: i32, y: i32) -> bool {
     self.cells[[x as usize, y as usize]].blocks_sight
+}
+
+pub fn blocks_player_sight(&self, x: i32, y: i32) -> bool {
+    self.cells[[x as usize, y as usize]].blocks_player_sight
 }
 
 pub fn hides_player(&self, x: i32, y: i32) -> bool {
